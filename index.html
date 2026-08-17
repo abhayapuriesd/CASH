@@ -472,7 +472,7 @@ async function downloadExcel() {
 
   try {
     const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet('Sheet1');
+    const ws = wb.addWorksheet('Collection Report');
 
     ws.columns = [
       { width: 12 }, { width: 10 }, { width: 10 }, { width: 10 }, { width: 10 },
@@ -557,7 +557,7 @@ async function downloadExcel() {
           cell.alignment = { horizontal: 'center' };
           cell.font = { color: { argb: 'FF444444' } };
         } else {
-          cell.numFmt = '#,##0';
+          cell.numFmt = '#,##,##0';
           cell.alignment = { horizontal: 'right' };
           if (c === 10 || c === 14) cell.font = { bold: true, color: { argb: 'FF1F5FBF' } };
         }
@@ -582,18 +582,22 @@ async function downloadExcel() {
         bottom: { style: 'thin', color: { argb: 'FFB0B7BF' } },
         right: { style: 'thin', color: { argb: 'FFB0B7BF' } },
       };
-      if (c > 1) { cell.numFmt = '#,##0'; cell.alignment = { horizontal: 'right' }; }
+      if (c > 1) { cell.numFmt = '#,##,##0'; cell.alignment = { horizontal: 'right' }; }
       else cell.alignment = { horizontal: 'center' };
     }
 
-    ws.views = [{ state: 'frozen', ySplit: 3 }];
+    ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 3, topLeftCell: 'A4', activeCell: 'A4' }];
+
+    wb.creator = 'Collection Report Builder';
 
     const buf = await wb.xlsx.writeBuffer();
     const blob = new Blob([buf], { type: 'application/octet-stream' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    const now = new Date();
-    link.download = `coll_${now.getFullYear()}-${pad2(now.getMonth() + 1)}.xlsx`;
+    const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const firstDate = rows[0].date;
+    const monthLabel = MONTH_NAMES[firstDate.getUTCMonth()] + ' ' + firstDate.getUTCFullYear();
+    link.download = `Collection Report - ${monthLabel}.xlsx`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
