@@ -171,32 +171,62 @@ function setStatus(id, msg, isError) {
   }
 }
 
-function parseExcelDate(v) {
-  // handles JS Date, Excel serial number, or string date
-  if (v instanceof Date) return v;
+// All date handling below works directly off the calendar y/m/d components
+// (never through a JS Date object's local/UTC getters while reading source
+// files) so the result can never shift by a day because of the browser's
+// timezone. A JS Date (built with Date.UTC) is only constructed at the very
+// end, purely to sort/iterate/display, and is always read back with the UTC
+// getters to match how it was built.
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+// Excel serial date number -> 'YYYY-MM-DD' key, no Date object involved.
+function excelSerialToKey(serial) {
+  const d = XLSX.SSF.parse_date_code(serial);
+  if (!d) return null;
+  return d.y + '-' + pad2(d.m) + '-' + pad2(d.d);
+}
+
+// Accepts a raw cell value (number, string, or Date) coming from either the
+// CSV or an Excel file and returns a 'YYYY-MM-DD' key using its own calendar
+// components only.
+function cellDateToKey(v) {
+  if (v === null || v === undefined || v === '') return null;
   if (typeof v === 'number') {
-    // Excel serial date -> JS date
-    const d = XLSX.SSF.parse_date_code(v);
-    return new Date(Date.UTC(d.y, d.m - 1, d.d));
+    return excelSerialToKey(v);
+  }
+  if (v instanceof Date) {
+    // Only reached if a library handed us a Date object directly. Use LOCAL
+    // getters here because that's how such objects are normally constructed
+    // (new Date(y, m, d) uses local time), so this stays consistent with the
+    // calendar date the source actually intended.
+    return v.getFullYear() + '-' + pad2(v.getMonth() + 1) + '-' + pad2(v.getDate());
   }
   if (typeof v === 'string') {
-    const d = new Date(v);
-    if (!isNaN(d)) return d;
+    const s = v.trim();
+    let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);       // YYYY-MM-DD
+    if (m) return m[1] + '-' + pad2(m[2]) + '-' + pad2(m[3]);
+    m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/); // DD-MM-YYYY or DD/MM/YYYY
+    if (m) return m[3] + '-' + pad2(m[1]) + '-' + pad2(m[2]);
+    const d = new Date(s);
+    if (!isNaN(d)) return cellDateToKey(d);
   }
   return null;
 }
 
-function dateKey(d) {
-  if (!d) return null;
-  const y = d.getUTCFullYear ? d.getUTCFullYear() : d.getFullYear();
-  const m = (d.getUTCMonth ? d.getUTCMonth() : d.getMonth()) + 1;
-  const day = d.getUTCDate ? d.getUTCDate() : d.getDate();
-  return y + '-' + String(m).padStart(2,'0') + '-' + String(day).padStart(2,'0');
+// Build a UTC-based Date purely for sorting/iterating/exporting, from a
+// 'YYYY-MM-DD' key. Always read back with getUTC* to match.
+function keyToUTCDate(key) {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d));
 }
 
 async function readWorkbook(file) {
   const buf = await file.arrayBuffer();
-  return XLSX.read(buf, { type: 'array', cellDates: true });
+  // Deliberately NOT using cellDates:true — we read the raw Excel serial
+  // number ourselves via excelSerialToKey() to avoid any local-timezone
+  // conversion that a JS Date object would introduce.
+  return XLSX.read(buf, { type: 'array' });
 }
 
 async function readCSVRows(file) {
@@ -247,8 +277,7 @@ async function processFiles() {
       const cid = (r[8] || '').trim();
       const billType = (r[9] || '').trim();
       if (!targetIds.has(cid)) continue;
-      const d = new Date(dateStr);
-      const key = dateKey(d);
+      const key = cellDateToKey(dateStr);
       if (!key) continue;
       if (billType === 'ENERGY BILL') {
         energy[key] = energy[key] || { cash: 0, cheque: 0 };
@@ -278,11 +307,10 @@ async function processFiles() {
         if (!row || row.length < 10) continue;
         const billHead = row[6] ? String(row[6]).trim() : null;
         const amount = typeof row[7] === 'number' ? row[7] : parseFloat(row[7]);
-        const payDate = parseExcelDate(row[8]);
+        const key = cellDateToKey(row[8]);
         const receivedBy = row[9] ? String(row[9]).trim() : null;
-        if (!billHead || isNaN(amount) || !payDate || !receivedBy) continue;
+        if (!billHead || isNaN(amount) || !key || !receivedBy) continue;
         if (!targetIds.has(receivedBy)) continue;
-        const key = dateKey(payDate);
         hwRowCount++;
         if (billHead === 'TEMPORARY SERVICE CONNECTION ENERGY CHARGE') continue;
         if (billHead.includes('METER COST')) {
@@ -311,11 +339,10 @@ async function processFiles() {
           if (!row || row.length < 11) continue;
           const mode = row[2] ? String(row[2]).trim() : null;
           const amount = typeof row[3] === 'number' ? row[3] : parseFloat(row[3]);
-          const payDate = parseExcelDate(row[4]);
+          const key = cellDateToKey(row[4]);
           const cid = row[10] ? String(row[10]).trim() : null;
-          if (!mode || isNaN(amount) || !payDate || !cid) continue;
+          if (!mode || isNaN(amount) || !key || !cid) continue;
           if (!targetIds.has(cid)) continue;
-          const key = dateKey(payDate);
           spRowCount++;
           if (mode === 'cash' || mode === 'cash_os') {
             spCash[key] = (spCash[key] || 0) + amount;
@@ -339,14 +366,14 @@ async function processFiles() {
       return;
     }
     const sortedKeys = [...allKeys].sort();
-    const minDate = new Date(sortedKeys[0]);
-    const maxDate = new Date(sortedKeys[sortedKeys.length - 1]);
+    const minDate = keyToUTCDate(sortedKeys[0]);
+    const maxDate = keyToUTCDate(sortedKeys[sortedKeys.length - 1]);
 
     const rows = [];
-    let cur = new Date(Date.UTC(minDate.getUTCFullYear(), minDate.getUTCMonth(), minDate.getUTCDate()));
-    const endD = new Date(Date.UTC(maxDate.getUTCFullYear(), maxDate.getUTCMonth(), maxDate.getUTCDate()));
+    let cur = new Date(minDate.getTime());
+    const endD = new Date(maxDate.getTime());
     while (cur <= endD) {
-      const key = dateKey(cur);
+      const key = cur.getUTCFullYear() + '-' + pad2(cur.getUTCMonth() + 1) + '-' + pad2(cur.getUTCDate());
       const eCash = (energy[key] && energy[key].cash) || 0;
       const eCheque = (energy[key] && energy[key].cheque) || 0;
       const spC = spCash[key] || 0;
