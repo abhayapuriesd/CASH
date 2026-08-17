@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coll Report — July 2026</title>
+<style>
+  :root {
+    --bg: #0f1419; --panel: #161b22; --border: #2a323c;
+    --text: #e6edf3; --muted: #8b949e; --accent: #4f8cff; --accent2: #3fb950;
+    --header-bg: #1c2733; --row-alt: #131a22; --total-bg: #1a2f22;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:'Segoe UI',Roboto,-apple-system,sans-serif; background:var(--bg); color:var(--text); padding:32px 16px 64px; }
+  .wrap { max-width: 1250px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; font-weight: 600; }
+  .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 20px; }
+  .btn {
+    background: var(--accent2); color: #04240f; border: none; border-radius: 8px;
+    padding: 10px 18px; font-weight: 600; font-size: 0.9rem; cursor: pointer; margin-bottom: 20px;
+  }
+  .btn:hover { opacity: 0.9; }
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; min-width: 1150px; font-size: 0.82rem; }
+  thead th { background: var(--header-bg); color: var(--text); font-weight: 600; padding: 8px 10px; text-align: right; border: 1px solid var(--border); white-space: nowrap; }
+  thead th:first-child { text-align: left; }
+  thead tr.section-row th { text-align: center; background: #21293380; font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  tbody td { padding: 6px 10px; border: 1px solid var(--border); }
+  tbody tr:nth-child(even) { background: var(--row-alt); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.total-col { font-weight: 600; color: var(--accent); }
+  tr.grand-total { background: var(--total-bg) !important; font-weight: 700; }
+  footer { margin-top: 20px; color: var(--muted); font-size: 0.78rem; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Daily Collection Report</h1>
+  <div class="subtitle">July 2026 &nbsp;•&nbsp; Collector IDs: 40003813 &amp; 40003144 &nbsp;•&nbsp; Format matches coll.xlsx</div>
+
+  <button class="btn" onclick="downloadExcel()">⬇ Download as Excel (.xls)</button>
+
+  <div class="table-scroll">
+  <table id="collTable">
+    <thead>
+      <tr class="section-row">
+        <th rowspan="3">DATE</th>
+        <th colspan="9">Collection</th>
+        <th colspan="4">Deposite</th>
+      </tr>
+      <tr>
+        <th colspan="2">ENERGY BILL</th>
+        <th colspan="2">Smart Prepaid</th>
+        <th rowspan="2">Assessment</th>
+        <th rowspan="2">RC/DC</th>
+        <th rowspan="2">Meter Cost</th>
+        <th rowspan="2">Misc</th>
+        <th rowspan="2">Total</th>
+        <th rowspan="2">Rev Ac</th>
+        <th rowspan="2">RC/DC AC</th>
+        <th rowspan="2">DW AC</th>
+        <th rowspan="2">Total</th>
+      </tr>
+      <tr>
+        <th>cash</th><th>Cheque</th><th>cash</th><th>Cheque</th>
+      </tr>
+    </thead>
+    <tbody>
+      
+    <tr>
+      <td>01-Jul-26</td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num">72,109</td>
+      <td class="num"></td>
+      <td class="num">35,873</td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num">875</td>
+      <td class="num total-col">108,857</td>
+      <td class="num">107,982</td>
+      <td class="num"></td>
+      <td class="num">875</td>
+      <td class="num total-col">108,857</td>
+    </tr>
+    <tr>
+      <td>02-Jul-26</td>
+      <td class="num">2,980</td>
+      <td class="num"></td>
+      <td class="num">50,291</td>
+      <td class="num"></td>
+      <td class="num">29,245</td>
+      <td class="num">800</td>
+      <td class="num">12,980</td>
+      <td class="num">4,875</td>
+      <td class="num total-col">101,171</td>
+      <td class="num">82,516</td>
+      <td class="num">800</td>
+      <td class="num">17,855</td>
+      <td class="num total-col">101,171</td>
+    </tr>
+    <tr>
+      <td>03-Jul-26</td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num">47,341</td>
+      <td class="num"></td>
+      <td class="num">6,421</td>
+      <td class="num"></td>
+      <td class="num">12,980</td>
+      <td class="num">4,790</td>
+      <td class="num total-col">71,532</td>
+      <td class="num">53,762</td>
+      <td class="num"></td>
+      <td class="num">17,770</td>
+      <td class="num total-col">71,532</td>
+    </tr>
+    <tr>
+      <td>04-Jul-26</td>
+      <td class="num">11,820</td>
+      <td class="num"></td>
+      <td class="num">59,606</td>
+      <td class="num"></td>
+      <td class="num">1,874</td>
+      <td class="num"></td>
+      <td class="num">25,960</td>
+      <td class="num">5,550</td>
+      <td class="num total-col">104,810</td>
+      <td class="num">73,300</td>
+      <td class="num"></td>
+      <td class="num">31,510</td>
+      <td class="num total-col">104,810</td>
+    </tr>
+    <tr>
+      <td>05-Jul-26</td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num total-col"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num total-col"></td>
+    </tr>
+    <tr>
+      <td>06-Jul-26</td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num">58,870</td>
+      <td class="num"></td>
+      <td class="num">901</td>
+      <td class="num">400</td>
+      <td class="num">19,470</td>
+      <td class="num">3,545</td>
+      <td class="num total-col">83,186</td>
+      <td class="num">59,771</td>
+      <td class="num">400</td>
+      <td class="num">23,015</td>
+      <td class="num total-col">83,186</td>
+    </tr>
+    <tr>
+      <td>07-Jul-26</td>
+      <td class="num">1,518</td>
+      <td class="num"></td>
+      <td class="num">36,214</td>
+      <td class="num"></td>
+      <td class="num">966</td>
+      <td class="num"></td>
+      <td class="num">6,490</td>
+      <td class="num">2,470</td>
+      <td class="num total-col">47,658</td>
+      <td class="num">38,698</td>
+      <td class="num"></td>
+      <td class="num">8,960</td>
+      <td class="num total-col">47,658</td>
+    </tr>
+    <tr>
+      <td>08-Jul-26</td>
+      <td class="num"></td>
+      <td class="num">53,774</td>
+      <td class="num">46,170</td>
+      <td class="num"></td>
+      <td class="num">1,805</td>
+      <td class="num"></td>
+      <td class="num">25,960</td>
+      <td class="num">2,915</td>
+      <td class="num total-col">130,624</td>
+      <td class="num">101,749</td>
+      <td class="num"></td>
+      <td class="num">28,875</td>
+      <td class="num total-col">130,624</td>
+    </tr>
+    <tr>
+      <td>09-Jul-26</td>
+      <td class="num">5,995</td>
+      <td class="num"></td>
+      <td class="num">26,271</td>
+      <td class="num"></td>
+      <td class="num">2,744</td>
+      <td class="num">400</td>
+      <td class="num">12,980</td>
+      <td class="num">2,920</td>
+      <td class="num total-col">51,310</td>
+      <td class="num">35,010</td>
+      <td class="num">400</td>
+      <td class="num">15,900</td>
+      <td class="num total-col">51,310</td>
+    </tr>
+    <tr>
+      <td>10-Jul-26</td>
+      <td class="num">7,600</td>
+      <td class="num"></td>
+      <td class="num">45,000</td>
+      <td class="num"></td>
+      <td class="num">4,667</td>
+      <td class="num">2,000</td>
+      <td class="num">6,490</td>
+      <td class="num">4,220</td>
+      <td class="num total-col">69,977</td>
+      <td class="num">57,267</td>
+      <td class="num">2,000</td>
+      <td class="num">10,710</td>
+      <td class="num total-col">69,977</td>
+    </tr>
+    <tr>
+      <td>11-Jul-26</td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num total-col"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num total-col"></td>
+    </tr>
+    <tr>
+      <td>12-Jul-26</td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num total-col"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num total-col"></td>
+    </tr>
+    <tr>
+      <td>13-Jul-26</td>
+      <td class="num">2,619</td>
+      <td class="num"></td>
+      <td class="num">55,430</td>
+      <td class="num">5,000</td>
+      <td class="num">920</td>
+      <td class="num">200</td>
+      <td class="num">58,410</td>
+      <td class="num">11,000</td>
+      <td class="num total-col">133,579</td>
+      <td class="num">63,969</td>
+      <td class="num">200</td>
+      <td class="num">69,410</td>
+      <td class="num total-col">133,579</td>
+    </tr>
+    <tr>
+      <td>14-Jul-26</td>
+      <td class="num">2,522</td>
+      <td class="num"></td>
+      <td class="num">57,020</td>
+      <td class="num"></td>
+      <td class="num">3,146</td>
+      <td class="num">600</td>
+      <td class="num">38,940</td>
+      <td class="num">30,221</td>
+      <td class="num total-col">132,449</td>
+      <td class="num">62,688</td>
+      <td class="num">600</td>
+      <td class="num">69,161</td>
+      <td class="num total-col">132,449</td>
+    </tr>
+    <tr>
+      <td>15-Jul-26</td>
+      <td class="num">61</td>
+      <td class="num"></td>
+      <td class="num">27,873</td>
+      <td class="num"></td>
+      <td class="num">1,177</td>
+      <td class="num">200</td>
+      <td class="num">19,470</td>
+      <td class="num">5,050</td>
+      <td class="num total-col">53,831</td>
+      <td class="num">29,111</td>
+      <td class="num">200</td>
+      <td class="num">24,520</td>
+      <td class="num total-col">53,831</td>
+    </tr>
+    <tr>
+      <td>16-Jul-26</td>
+      <td class="num">4,500</td>
+      <td class="num"></td>
+      <td class="num">29,193</td>
+      <td class="num">15,000</td>
+      <td class="num">5,237</td>
+      <td class="num">200</td>
+      <td class="num">51,920</td>
+      <td class="num">10,045</td>
+      <td class="num total-col">116,095</td>
+      <td class="num">53,930</td>
+      <td class="num">200</td>
+      <td class="num">61,965</td>
+      <td class="num total-col">116,095</td>
+    </tr>
+    <tr>
+      <td>17-Jul-26</td>
+      <td class="num">7,000</td>
+      <td class="num"></td>
+      <td class="num">31,530</td>
+      <td class="num"></td>
+      <td class="num">8,429</td>
+      <td class="num">200</td>
+      <td class="num">12,980</td>
+      <td class="num">3,515</td>
+      <td class="num total-col">63,654</td>
+      <td class="num">46,959</td>
+      <td class="num">200</td>
+      <td class="num">16,495</td>
+      <td class="num total-col">63,654</td>
+    </tr>
+    <tr>
+      <td>18-Jul-26</td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num">21,277</td>
+      <td class="num"></td>
+      <td class="num">1,568</td>
+      <td class="num">400</td>
+      <td class="num"></td>
+      <td class="num">970</td>
+      <td class="num total-col">24,215</td>
+      <td class="num">22,845</td>
+      <td class="num">400</td>
+      <td class="num">970</td>
+      <td class="num total-col">24,215</td>
+    </tr>
+    <tr>
+      <td>19-Jul-26</td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num total-col"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num total-col"></td>
+    </tr>
+    <tr>
+      <td>20-Jul-26</td>
+      <td class="num">20,550</td>
+      <td class="num"></td>
+      <td class="num">40,355</td>
+      <td class="num"></td>
+      <td class="num">11,045</td>
+      <td class="num"></td>
+      <td class="num">12,980</td>
+      <td class="num">2,990</td>
+      <td class="num total-col">87,920</td>
+      <td class="num">71,950</td>
+      <td class="num"></td>
+      <td class="num">15,970</td>
+      <td class="num total-col">87,920</td>
+    </tr>
+    <tr>
+      <td>21-Jul-26</td>
+      <td class="num">16,700</td>
+      <td class="num"></td>
+      <td class="num">34,993</td>
+      <td class="num"></td>
+      <td class="num">80,756</td>
+      <td class="num">200</td>
+      <td class="num">19,470</td>
+      <td class="num">4,840</td>
+      <td class="num total-col">156,959</td>
+      <td class="num">132,449</td>
+      <td class="num">200</td>
+      <td class="num">24,310</td>
+      <td class="num total-col">156,959</td>
+    </tr>
+    <tr>
+      <td>22-Jul-26</td>
+      <td class="num">10,913</td>
+      <td class="num"></td>
+      <td class="num">32,694</td>
+      <td class="num"></td>
+      <td class="num">21,450</td>
+      <td class="num">600</td>
+      <td class="num">25,960</td>
+      <td class="num">7,265</td>
+      <td class="num total-col">98,882</td>
+      <td class="num">65,057</td>
+      <td class="num">600</td>
+      <td class="num">33,225</td>
+      <td class="num total-col">98,882</td>
+    </tr>
+    <tr>
+      <td>23-Jul-26</td>
+      <td class="num">1,265</td>
+      <td class="num"></td>
+      <td class="num">27,464</td>
+      <td class="num">20,000</td>
+      <td class="num">2,282</td>
+      <td class="num"></td>
+      <td class="num">45,430</td>
+      <td class="num">8,465</td>
+      <td class="num total-col">104,906</td>
+      <td class="num">51,011</td>
+      <td class="num"></td>
+      <td class="num">53,895</td>
+      <td class="num total-col">104,906</td>
+    </tr>
+    <tr>
+      <td>24-Jul-26</td>
+      <td class="num">8,625</td>
+      <td class="num"></td>
+      <td class="num">48,283</td>
+      <td class="num"></td>
+      <td class="num">10,296</td>
+      <td class="num">400</td>
+      <td class="num">32,450</td>
+      <td class="num">6,850</td>
+      <td class="num total-col">106,904</td>
+      <td class="num">67,204</td>
+      <td class="num">400</td>
+      <td class="num">39,300</td>
+      <td class="num total-col">106,904</td>
+    </tr>
+    <tr>
+      <td>25-Jul-26</td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num total-col"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num total-col"></td>
+    </tr>
+    <tr>
+      <td>26-Jul-26</td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num total-col"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num"></td>
+      <td class="num total-col"></td>
+    </tr>
+    <tr>
+      <td>27-Jul-26</td>
+      <td class="num">350</td>
+      <td class="num"></td>
+      <td class="num">87,698</td>
+      <td class="num">10,000</td>
+      <td class="num">197,169</td>
+      <td class="num"></td>
+      <td class="num">6,490</td>
+      <td class="num">7,120</td>
+      <td class="num total-col">308,827</td>
+      <td class="num">295,217</td>
+      <td class="num"></td>
+      <td class="num">13,610</td>
+      <td class="num total-col">308,827</td>
+    </tr>
+    <tr>
+      <td>28-Jul-26</td>
+      <td class="num">12,190</td>
+      <td class="num"></td>
+      <td class="num">67,545</td>
+      <td class="num"></td>
+      <td class="num">12,515</td>
+      <td class="num"></td>
+      <td class="num">6,490</td>
+      <td class="num">2,850</td>
+      <td class="num total-col">101,590</td>
+      <td class="num">92,250</td>
+      <td class="num"></td>
+      <td class="num">9,340</td>
+      <td class="num total-col">101,590</td>
+    </tr>
+    <tr>
+      <td>29-Jul-26</td>
+      <td class="num">38,720</td>
+      <td class="num"></td>
+      <td class="num">63,750</td>
+      <td class="num">20,000</td>
+      <td class="num"></td>
+      <td class="num">600</td>
+      <td class="num">19,470</td>
+      <td class="num">4,545</td>
+      <td class="num total-col">147,085</td>
+      <td class="num">122,470</td>
+      <td class="num">600</td>
+      <td class="num">24,015</td>
+      <td class="num total-col">147,085</td>
+    </tr>
+    <tr>
+      <td>30-Jul-26</td>
+      <td class="num">2,500</td>
+      <td class="num"></td>
+      <td class="num">39,000</td>
+      <td class="num">10,000</td>
+      <td class="num">5,520</td>
+      <td class="num">900</td>
+      <td class="num">19,470</td>
+      <td class="num">3,895</td>
+      <td class="num total-col">81,285</td>
+      <td class="num">57,020</td>
+      <td class="num">900</td>
+      <td class="num">23,365</td>
+      <td class="num total-col">81,285</td>
+    </tr>
+    <tr>
+      <td>31-Jul-26</td>
+      <td class="num">30,400</td>
+      <td class="num"></td>
+      <td class="num">40,952</td>
+      <td class="num">7,000</td>
+      <td class="num">4,618</td>
+      <td class="num">1,200</td>
+      <td class="num">58,410</td>
+      <td class="num">10,745</td>
+      <td class="num total-col">153,325</td>
+      <td class="num">82,970</td>
+      <td class="num">1,200</td>
+      <td class="num">69,155</td>
+      <td class="num total-col">153,325</td>
+    </tr>
+      
+    <tr class="grand-total">
+      <td>TOTAL</td>
+      <td class="num">188,828</td>
+      <td class="num">53,774</td>
+      <td class="num">1,146,929</td>
+      <td class="num">87,000</td>
+      <td class="num">450,624</td>
+      <td class="num">9,300</td>
+      <td class="num">551,650</td>
+      <td class="num">152,526</td>
+      <td class="num total-col">2,640,631</td>
+      <td class="num">1,927,155</td>
+      <td class="num">9,300</td>
+      <td class="num">704,176</td>
+      <td class="num total-col">2,640,631</td>
+    </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <footer>
+    RC/DC = Daily Collection (Disconnection/Reconnection Charge) + HeadWise (Disconnection Reconnection Charge + New Service Connection Disconnection Charge).<br>
+    Deposite → Rev A/c = Energy Bill + Assessment + Smart Prepaid &nbsp;|&nbsp; RC/DC A/c = All RC/DC &nbsp;|&nbsp; DW A/c = Meter Cost + Misc.<br>
+    Filtered to Collector IDs <code>40003813</code> &amp; <code>40003144</code> only. Temporary Energy Charge and Meter Cost entries of ₹2,400/₹6,000 excluded per instructions.
+  </footer>
+</div>
+
+<script>
+function downloadExcel() {
+  const table = document.getElementById('collTable');
+  let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">';
+  html += '<head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Sheet1</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body>';
+  html += table.outerHTML;
+  html += '</body></html>';
+  const blob = new Blob(['\ufeff' + html], { type: 'application/vnd.ms-excel' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'coll_report_july2026.xls';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+</script>
+</body>
+</html>
