@@ -3,23 +3,60 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Coll Report — July 2026</title>
+<title>Collection Report Builder</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <style>
   :root {
     --bg: #0f1419; --panel: #161b22; --border: #2a323c;
     --text: #e6edf3; --muted: #8b949e; --accent: #4f8cff; --accent2: #3fb950;
+    --danger: #f85149;
     --header-bg: #1c2733; --row-alt: #131a22; --total-bg: #1a2f22;
   }
   * { box-sizing: border-box; }
   body { margin:0; font-family:'Segoe UI',Roboto,-apple-system,sans-serif; background:var(--bg); color:var(--text); padding:32px 16px 64px; }
   .wrap { max-width: 1250px; margin: 0 auto; }
   h1 { font-size: 1.5rem; margin: 0 0 4px; font-weight: 600; }
+  h2 { font-size: 1.05rem; margin: 28px 0 10px; font-weight: 600; color: var(--text); }
   .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 20px; }
+
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+
+  .id-row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom: 18px; }
+  .id-row label { font-size: 0.82rem; color: var(--muted); }
+  .id-row input[type=text] {
+    background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    border-radius: 6px; padding: 8px 10px; font-size: 0.85rem; width: 260px;
+  }
+
+  .upload-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+  .upload-slot {
+    border: 1.5px dashed var(--border); border-radius: 10px; padding: 16px;
+    background: var(--bg); transition: border-color 0.15s;
+  }
+  .upload-slot.filled { border-color: var(--accent2); border-style: solid; }
+  .upload-slot .title { font-weight: 600; font-size: 0.88rem; margin-bottom: 4px; }
+  .upload-slot .desc { color: var(--muted); font-size: 0.75rem; margin-bottom: 10px; line-height:1.4; }
+  .upload-slot input[type=file] { font-size: 0.78rem; color: var(--muted); width: 100%; }
+  .upload-slot .status { margin-top: 8px; font-size: 0.78rem; color: var(--accent2); min-height: 1em; }
+
   .btn {
     background: var(--accent2); color: #04240f; border: none; border-radius: 8px;
-    padding: 10px 18px; font-weight: 600; font-size: 0.9rem; cursor: pointer; margin-bottom: 20px;
+    padding: 11px 20px; font-weight: 600; font-size: 0.9rem; cursor: pointer;
   }
   .btn:hover { opacity: 0.9; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn.secondary { background: var(--accent); color: #04122e; }
+  .btn-row { display:flex; gap:12px; align-items:center; margin: 18px 0; flex-wrap:wrap; }
+
+  #status-msg { color: var(--muted); font-size: 0.85rem; }
+  #status-msg.error { color: var(--danger); }
+
+  .meta-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 22px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .card .label { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
+  .card .value { font-size: 1.2rem; font-weight: 600; color: var(--accent2); }
+
   .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
   table { border-collapse: collapse; width: 100%; min-width: 1150px; font-size: 0.82rem; }
   thead th { background: var(--header-bg); color: var(--text); font-weight: 600; padding: 8px 10px; text-align: right; border: 1px solid var(--border); white-space: nowrap; }
@@ -30,582 +67,447 @@
   td.num { text-align: right; font-variant-numeric: tabular-nums; }
   td.total-col { font-weight: 600; color: var(--accent); }
   tr.grand-total { background: var(--total-bg) !important; font-weight: 700; }
-  footer { margin-top: 20px; color: var(--muted); font-size: 0.78rem; line-height: 1.5; }
+
+  footer { margin-top: 24px; color: var(--muted); font-size: 0.78rem; line-height: 1.6; }
+  footer code { background: var(--panel); padding: 1px 5px; border-radius: 4px; }
+
+  #resultsSection { display: none; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Daily Collection Report</h1>
-  <div class="subtitle">July 2026 &nbsp;•&nbsp; Collector IDs: 40003813 &amp; 40003144 &nbsp;•&nbsp; Format matches coll.xlsx</div>
+  <h1>Collection Report Builder</h1>
+  <div class="subtitle">Upload this month's source files → get the coll.xlsx collection report automatically.</div>
 
-  <button class="btn" onclick="downloadExcel()">⬇ Download as Excel (.xls)</button>
+  <div class="panel">
+    <h2 style="margin-top:0;">1. Collector IDs</h2>
+    <div class="id-row">
+      <label>Collector IDs to include (comma separated):</label>
+      <input type="text" id="collectorIds" value="40003813, 40003144">
+    </div>
 
-  <div class="table-scroll">
-  <table id="collTable">
-    <thead>
-      <tr class="section-row">
-        <th rowspan="3">DATE</th>
-        <th colspan="9">Collection</th>
-        <th colspan="4">Deposite</th>
-      </tr>
-      <tr>
-        <th colspan="2">ENERGY BILL</th>
-        <th colspan="2">Smart Prepaid</th>
-        <th rowspan="2">Assessment</th>
-        <th rowspan="2">RC/DC</th>
-        <th rowspan="2">Meter Cost</th>
-        <th rowspan="2">Misc</th>
-        <th rowspan="2">Total</th>
-        <th rowspan="2">Rev Ac</th>
-        <th rowspan="2">RC/DC AC</th>
-        <th rowspan="2">DW AC</th>
-        <th rowspan="2">Total</th>
-      </tr>
-      <tr>
-        <th>cash</th><th>Cheque</th><th>cash</th><th>Cheque</th>
-      </tr>
-    </thead>
-    <tbody>
-      
-    <tr>
-      <td>01-Jul-26</td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num">72,109</td>
-      <td class="num"></td>
-      <td class="num">35,873</td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num">875</td>
-      <td class="num total-col">108,857</td>
-      <td class="num">107,982</td>
-      <td class="num"></td>
-      <td class="num">875</td>
-      <td class="num total-col">108,857</td>
-    </tr>
-    <tr>
-      <td>02-Jul-26</td>
-      <td class="num">2,980</td>
-      <td class="num"></td>
-      <td class="num">50,291</td>
-      <td class="num"></td>
-      <td class="num">29,245</td>
-      <td class="num">800</td>
-      <td class="num">12,980</td>
-      <td class="num">4,875</td>
-      <td class="num total-col">101,171</td>
-      <td class="num">82,516</td>
-      <td class="num">800</td>
-      <td class="num">17,855</td>
-      <td class="num total-col">101,171</td>
-    </tr>
-    <tr>
-      <td>03-Jul-26</td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num">47,341</td>
-      <td class="num"></td>
-      <td class="num">6,421</td>
-      <td class="num"></td>
-      <td class="num">12,980</td>
-      <td class="num">4,790</td>
-      <td class="num total-col">71,532</td>
-      <td class="num">53,762</td>
-      <td class="num"></td>
-      <td class="num">17,770</td>
-      <td class="num total-col">71,532</td>
-    </tr>
-    <tr>
-      <td>04-Jul-26</td>
-      <td class="num">11,820</td>
-      <td class="num"></td>
-      <td class="num">59,606</td>
-      <td class="num"></td>
-      <td class="num">1,874</td>
-      <td class="num"></td>
-      <td class="num">25,960</td>
-      <td class="num">5,550</td>
-      <td class="num total-col">104,810</td>
-      <td class="num">73,300</td>
-      <td class="num"></td>
-      <td class="num">31,510</td>
-      <td class="num total-col">104,810</td>
-    </tr>
-    <tr>
-      <td>05-Jul-26</td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num total-col"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num total-col"></td>
-    </tr>
-    <tr>
-      <td>06-Jul-26</td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num">58,870</td>
-      <td class="num"></td>
-      <td class="num">901</td>
-      <td class="num">400</td>
-      <td class="num">19,470</td>
-      <td class="num">3,545</td>
-      <td class="num total-col">83,186</td>
-      <td class="num">59,771</td>
-      <td class="num">400</td>
-      <td class="num">23,015</td>
-      <td class="num total-col">83,186</td>
-    </tr>
-    <tr>
-      <td>07-Jul-26</td>
-      <td class="num">1,518</td>
-      <td class="num"></td>
-      <td class="num">36,214</td>
-      <td class="num"></td>
-      <td class="num">966</td>
-      <td class="num"></td>
-      <td class="num">6,490</td>
-      <td class="num">2,470</td>
-      <td class="num total-col">47,658</td>
-      <td class="num">38,698</td>
-      <td class="num"></td>
-      <td class="num">8,960</td>
-      <td class="num total-col">47,658</td>
-    </tr>
-    <tr>
-      <td>08-Jul-26</td>
-      <td class="num"></td>
-      <td class="num">53,774</td>
-      <td class="num">46,170</td>
-      <td class="num"></td>
-      <td class="num">1,805</td>
-      <td class="num"></td>
-      <td class="num">25,960</td>
-      <td class="num">2,915</td>
-      <td class="num total-col">130,624</td>
-      <td class="num">101,749</td>
-      <td class="num"></td>
-      <td class="num">28,875</td>
-      <td class="num total-col">130,624</td>
-    </tr>
-    <tr>
-      <td>09-Jul-26</td>
-      <td class="num">5,995</td>
-      <td class="num"></td>
-      <td class="num">26,271</td>
-      <td class="num"></td>
-      <td class="num">2,744</td>
-      <td class="num">400</td>
-      <td class="num">12,980</td>
-      <td class="num">2,920</td>
-      <td class="num total-col">51,310</td>
-      <td class="num">35,010</td>
-      <td class="num">400</td>
-      <td class="num">15,900</td>
-      <td class="num total-col">51,310</td>
-    </tr>
-    <tr>
-      <td>10-Jul-26</td>
-      <td class="num">7,600</td>
-      <td class="num"></td>
-      <td class="num">45,000</td>
-      <td class="num"></td>
-      <td class="num">4,667</td>
-      <td class="num">2,000</td>
-      <td class="num">6,490</td>
-      <td class="num">4,220</td>
-      <td class="num total-col">69,977</td>
-      <td class="num">57,267</td>
-      <td class="num">2,000</td>
-      <td class="num">10,710</td>
-      <td class="num total-col">69,977</td>
-    </tr>
-    <tr>
-      <td>11-Jul-26</td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num total-col"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num total-col"></td>
-    </tr>
-    <tr>
-      <td>12-Jul-26</td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num total-col"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num total-col"></td>
-    </tr>
-    <tr>
-      <td>13-Jul-26</td>
-      <td class="num">2,619</td>
-      <td class="num"></td>
-      <td class="num">55,430</td>
-      <td class="num">5,000</td>
-      <td class="num">920</td>
-      <td class="num">200</td>
-      <td class="num">58,410</td>
-      <td class="num">11,000</td>
-      <td class="num total-col">133,579</td>
-      <td class="num">63,969</td>
-      <td class="num">200</td>
-      <td class="num">69,410</td>
-      <td class="num total-col">133,579</td>
-    </tr>
-    <tr>
-      <td>14-Jul-26</td>
-      <td class="num">2,522</td>
-      <td class="num"></td>
-      <td class="num">57,020</td>
-      <td class="num"></td>
-      <td class="num">3,146</td>
-      <td class="num">600</td>
-      <td class="num">38,940</td>
-      <td class="num">30,221</td>
-      <td class="num total-col">132,449</td>
-      <td class="num">62,688</td>
-      <td class="num">600</td>
-      <td class="num">69,161</td>
-      <td class="num total-col">132,449</td>
-    </tr>
-    <tr>
-      <td>15-Jul-26</td>
-      <td class="num">61</td>
-      <td class="num"></td>
-      <td class="num">27,873</td>
-      <td class="num"></td>
-      <td class="num">1,177</td>
-      <td class="num">200</td>
-      <td class="num">19,470</td>
-      <td class="num">5,050</td>
-      <td class="num total-col">53,831</td>
-      <td class="num">29,111</td>
-      <td class="num">200</td>
-      <td class="num">24,520</td>
-      <td class="num total-col">53,831</td>
-    </tr>
-    <tr>
-      <td>16-Jul-26</td>
-      <td class="num">4,500</td>
-      <td class="num"></td>
-      <td class="num">29,193</td>
-      <td class="num">15,000</td>
-      <td class="num">5,237</td>
-      <td class="num">200</td>
-      <td class="num">51,920</td>
-      <td class="num">10,045</td>
-      <td class="num total-col">116,095</td>
-      <td class="num">53,930</td>
-      <td class="num">200</td>
-      <td class="num">61,965</td>
-      <td class="num total-col">116,095</td>
-    </tr>
-    <tr>
-      <td>17-Jul-26</td>
-      <td class="num">7,000</td>
-      <td class="num"></td>
-      <td class="num">31,530</td>
-      <td class="num"></td>
-      <td class="num">8,429</td>
-      <td class="num">200</td>
-      <td class="num">12,980</td>
-      <td class="num">3,515</td>
-      <td class="num total-col">63,654</td>
-      <td class="num">46,959</td>
-      <td class="num">200</td>
-      <td class="num">16,495</td>
-      <td class="num total-col">63,654</td>
-    </tr>
-    <tr>
-      <td>18-Jul-26</td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num">21,277</td>
-      <td class="num"></td>
-      <td class="num">1,568</td>
-      <td class="num">400</td>
-      <td class="num"></td>
-      <td class="num">970</td>
-      <td class="num total-col">24,215</td>
-      <td class="num">22,845</td>
-      <td class="num">400</td>
-      <td class="num">970</td>
-      <td class="num total-col">24,215</td>
-    </tr>
-    <tr>
-      <td>19-Jul-26</td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num total-col"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num total-col"></td>
-    </tr>
-    <tr>
-      <td>20-Jul-26</td>
-      <td class="num">20,550</td>
-      <td class="num"></td>
-      <td class="num">40,355</td>
-      <td class="num"></td>
-      <td class="num">11,045</td>
-      <td class="num"></td>
-      <td class="num">12,980</td>
-      <td class="num">2,990</td>
-      <td class="num total-col">87,920</td>
-      <td class="num">71,950</td>
-      <td class="num"></td>
-      <td class="num">15,970</td>
-      <td class="num total-col">87,920</td>
-    </tr>
-    <tr>
-      <td>21-Jul-26</td>
-      <td class="num">16,700</td>
-      <td class="num"></td>
-      <td class="num">34,993</td>
-      <td class="num"></td>
-      <td class="num">80,756</td>
-      <td class="num">200</td>
-      <td class="num">19,470</td>
-      <td class="num">4,840</td>
-      <td class="num total-col">156,959</td>
-      <td class="num">132,449</td>
-      <td class="num">200</td>
-      <td class="num">24,310</td>
-      <td class="num total-col">156,959</td>
-    </tr>
-    <tr>
-      <td>22-Jul-26</td>
-      <td class="num">10,913</td>
-      <td class="num"></td>
-      <td class="num">32,694</td>
-      <td class="num"></td>
-      <td class="num">21,450</td>
-      <td class="num">600</td>
-      <td class="num">25,960</td>
-      <td class="num">7,265</td>
-      <td class="num total-col">98,882</td>
-      <td class="num">65,057</td>
-      <td class="num">600</td>
-      <td class="num">33,225</td>
-      <td class="num total-col">98,882</td>
-    </tr>
-    <tr>
-      <td>23-Jul-26</td>
-      <td class="num">1,265</td>
-      <td class="num"></td>
-      <td class="num">27,464</td>
-      <td class="num">20,000</td>
-      <td class="num">2,282</td>
-      <td class="num"></td>
-      <td class="num">45,430</td>
-      <td class="num">8,465</td>
-      <td class="num total-col">104,906</td>
-      <td class="num">51,011</td>
-      <td class="num"></td>
-      <td class="num">53,895</td>
-      <td class="num total-col">104,906</td>
-    </tr>
-    <tr>
-      <td>24-Jul-26</td>
-      <td class="num">8,625</td>
-      <td class="num"></td>
-      <td class="num">48,283</td>
-      <td class="num"></td>
-      <td class="num">10,296</td>
-      <td class="num">400</td>
-      <td class="num">32,450</td>
-      <td class="num">6,850</td>
-      <td class="num total-col">106,904</td>
-      <td class="num">67,204</td>
-      <td class="num">400</td>
-      <td class="num">39,300</td>
-      <td class="num total-col">106,904</td>
-    </tr>
-    <tr>
-      <td>25-Jul-26</td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num total-col"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num total-col"></td>
-    </tr>
-    <tr>
-      <td>26-Jul-26</td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num total-col"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num"></td>
-      <td class="num total-col"></td>
-    </tr>
-    <tr>
-      <td>27-Jul-26</td>
-      <td class="num">350</td>
-      <td class="num"></td>
-      <td class="num">87,698</td>
-      <td class="num">10,000</td>
-      <td class="num">197,169</td>
-      <td class="num"></td>
-      <td class="num">6,490</td>
-      <td class="num">7,120</td>
-      <td class="num total-col">308,827</td>
-      <td class="num">295,217</td>
-      <td class="num"></td>
-      <td class="num">13,610</td>
-      <td class="num total-col">308,827</td>
-    </tr>
-    <tr>
-      <td>28-Jul-26</td>
-      <td class="num">12,190</td>
-      <td class="num"></td>
-      <td class="num">67,545</td>
-      <td class="num"></td>
-      <td class="num">12,515</td>
-      <td class="num"></td>
-      <td class="num">6,490</td>
-      <td class="num">2,850</td>
-      <td class="num total-col">101,590</td>
-      <td class="num">92,250</td>
-      <td class="num"></td>
-      <td class="num">9,340</td>
-      <td class="num total-col">101,590</td>
-    </tr>
-    <tr>
-      <td>29-Jul-26</td>
-      <td class="num">38,720</td>
-      <td class="num"></td>
-      <td class="num">63,750</td>
-      <td class="num">20,000</td>
-      <td class="num"></td>
-      <td class="num">600</td>
-      <td class="num">19,470</td>
-      <td class="num">4,545</td>
-      <td class="num total-col">147,085</td>
-      <td class="num">122,470</td>
-      <td class="num">600</td>
-      <td class="num">24,015</td>
-      <td class="num total-col">147,085</td>
-    </tr>
-    <tr>
-      <td>30-Jul-26</td>
-      <td class="num">2,500</td>
-      <td class="num"></td>
-      <td class="num">39,000</td>
-      <td class="num">10,000</td>
-      <td class="num">5,520</td>
-      <td class="num">900</td>
-      <td class="num">19,470</td>
-      <td class="num">3,895</td>
-      <td class="num total-col">81,285</td>
-      <td class="num">57,020</td>
-      <td class="num">900</td>
-      <td class="num">23,365</td>
-      <td class="num total-col">81,285</td>
-    </tr>
-    <tr>
-      <td>31-Jul-26</td>
-      <td class="num">30,400</td>
-      <td class="num"></td>
-      <td class="num">40,952</td>
-      <td class="num">7,000</td>
-      <td class="num">4,618</td>
-      <td class="num">1,200</td>
-      <td class="num">58,410</td>
-      <td class="num">10,745</td>
-      <td class="num total-col">153,325</td>
-      <td class="num">82,970</td>
-      <td class="num">1,200</td>
-      <td class="num">69,155</td>
-      <td class="num total-col">153,325</td>
-    </tr>
-      
-    <tr class="grand-total">
-      <td>TOTAL</td>
-      <td class="num">188,828</td>
-      <td class="num">53,774</td>
-      <td class="num">1,146,929</td>
-      <td class="num">87,000</td>
-      <td class="num">450,624</td>
-      <td class="num">9,300</td>
-      <td class="num">551,650</td>
-      <td class="num">152,526</td>
-      <td class="num total-col">2,640,631</td>
-      <td class="num">1,927,155</td>
-      <td class="num">9,300</td>
-      <td class="num">704,176</td>
-      <td class="num total-col">2,640,631</td>
-    </tr>
-    </tbody>
-  </table>
+    <h2>2. Upload files for this month</h2>
+    <div class="upload-grid">
+      <div class="upload-slot" id="slot-daily">
+        <div class="title">Daily Collection (CSV)</div>
+        <div class="desc">MIS_Daily_Collection...csv — Energy Bill, Assessment Bill, RC/DC</div>
+        <input type="file" id="file-daily" accept=".csv">
+        <div class="status" id="status-daily"></div>
+      </div>
+      <div class="upload-slot" id="slot-headwise">
+        <div class="title">HeadWise Collection Report</div>
+        <div class="desc">headwiseCollectionReport...xls — Meter Cost, RC/DC, Misc (temporary energy charge and meter-cost entries of ₹2,400/₹6,000 auto-excluded)</div>
+        <input type="file" id="file-headwise" accept=".xls,.xlsx">
+        <div class="status" id="status-headwise"></div>
+      </div>
+      <div class="upload-slot" id="slot-smartprepaid">
+        <div class="title">Smart Prepaid Recharge Report(s)</div>
+        <div class="desc">smartPrepaidRechargeReport...xls — you can select multiple files at once (hold Ctrl/Cmd)</div>
+        <input type="file" id="file-smartprepaid" accept=".xls,.xlsx" multiple>
+        <div class="status" id="status-smartprepaid"></div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn" id="processBtn" onclick="processFiles()">Build Report</button>
+      <span id="status-msg"></span>
+    </div>
   </div>
 
-  <footer>
-    RC/DC = Daily Collection (Disconnection/Reconnection Charge) + HeadWise (Disconnection Reconnection Charge + New Service Connection Disconnection Charge).<br>
-    Deposite → Rev A/c = Energy Bill + Assessment + Smart Prepaid &nbsp;|&nbsp; RC/DC A/c = All RC/DC &nbsp;|&nbsp; DW A/c = Meter Cost + Misc.<br>
-    Filtered to Collector IDs <code>40003813</code> &amp; <code>40003144</code> only. Temporary Energy Charge and Meter Cost entries of ₹2,400/₹6,000 excluded per instructions.
-  </footer>
+  <div id="resultsSection">
+    <div class="meta-cards" id="metaCards"></div>
+
+    <div class="btn-row">
+      <button class="btn secondary" onclick="downloadExcel()">⬇ Download coll.xlsx</button>
+    </div>
+
+    <div class="table-scroll">
+    <table id="collTable">
+      <thead>
+        <tr class="section-row">
+          <th rowspan="3">DATE</th>
+          <th colspan="9">Collection</th>
+          <th colspan="4">Deposite</th>
+        </tr>
+        <tr>
+          <th colspan="2">ENERGY BILL</th>
+          <th colspan="2">Smart Prepaid</th>
+          <th rowspan="2">Assessment</th>
+          <th rowspan="2">RC/DC</th>
+          <th rowspan="2">Meter Cost</th>
+          <th rowspan="2">Misc</th>
+          <th rowspan="2">Total</th>
+          <th rowspan="2">Rev Ac</th>
+          <th rowspan="2">RC/DC AC</th>
+          <th rowspan="2">DW AC</th>
+          <th rowspan="2">Total</th>
+        </tr>
+        <tr>
+          <th>cash</th><th>Cheque</th><th>cash</th><th>Cheque</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+    </div>
+
+    <footer>
+      RC/DC = Daily Collection (Disconnection/Reconnection Charge) + HeadWise (Disconnection Reconnection Charge + New Service Connection Disconnection Charge).<br>
+      Deposite → Rev A/c = Energy Bill + Assessment + Smart Prepaid &nbsp;|&nbsp; RC/DC A/c = All RC/DC &nbsp;|&nbsp; DW A/c = Meter Cost + Misc.<br>
+      Temporary Energy Charge and Meter Cost entries of exactly ₹2,400 / ₹6,000 are excluded from HeadWise data. Only the Collector IDs listed above are included; everything else is ignored.
+    </footer>
+  </div>
 </div>
 
 <script>
-function downloadExcel() {
-  const table = document.getElementById('collTable');
-  let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">';
-  html += '<head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Sheet1</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body>';
-  html += table.outerHTML;
-  html += '</body></html>';
-  const blob = new Blob(['\ufeff' + html], { type: 'application/vnd.ms-excel' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = 'coll_report_july2026.xls';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+let computedData = null; // { rows: [...], dates: [...] }
+
+function setStatus(id, msg, isError) {
+  const el = document.getElementById('status-' + id);
+  if (el) el.textContent = msg;
+  if (id === 'msg') {
+    const m = document.getElementById('status-msg');
+    m.textContent = msg;
+    m.className = isError ? 'error' : '';
+  }
 }
+
+function parseExcelDate(v) {
+  // handles JS Date, Excel serial number, or string date
+  if (v instanceof Date) return v;
+  if (typeof v === 'number') {
+    // Excel serial date -> JS date
+    const d = XLSX.SSF.parse_date_code(v);
+    return new Date(Date.UTC(d.y, d.m - 1, d.d));
+  }
+  if (typeof v === 'string') {
+    const d = new Date(v);
+    if (!isNaN(d)) return d;
+  }
+  return null;
+}
+
+function dateKey(d) {
+  if (!d) return null;
+  const y = d.getUTCFullYear ? d.getUTCFullYear() : d.getFullYear();
+  const m = (d.getUTCMonth ? d.getUTCMonth() : d.getMonth()) + 1;
+  const day = d.getUTCDate ? d.getUTCDate() : d.getDate();
+  return y + '-' + String(m).padStart(2,'0') + '-' + String(day).padStart(2,'0');
+}
+
+async function readWorkbook(file) {
+  const buf = await file.arrayBuffer();
+  return XLSX.read(buf, { type: 'array', cellDates: true });
+}
+
+async function readCSVRows(file) {
+  const text = await file.text();
+  const parsed = Papa.parse(text, { header: false, skipEmptyLines: true });
+  return parsed.data;
+}
+
+function getTargetIds() {
+  return document.getElementById('collectorIds').value
+    .split(',').map(s => s.trim()).filter(Boolean);
+}
+
+async function processFiles() {
+  setStatus('msg', '');
+  const dailyFile = document.getElementById('file-daily').files[0];
+  const headwiseFile = document.getElementById('file-headwise').files[0];
+  const spFiles = document.getElementById('file-smartprepaid').files;
+
+  if (!dailyFile || !headwiseFile || spFiles.length === 0) {
+    setStatus('msg', 'Please upload all three: Daily Collection CSV, HeadWise report, and at least one Smart Prepaid report.', true);
+    return;
+  }
+
+  const targetIds = new Set(getTargetIds());
+  if (targetIds.size === 0) {
+    setStatus('msg', 'Please enter at least one Collector ID.', true);
+    return;
+  }
+
+  document.getElementById('processBtn').disabled = true;
+  setStatus('msg', 'Processing...');
+
+  try {
+    const energy = {};       // date -> {cash, cheque}
+    const assess = {};       // date -> amount
+    const rcdcDaily = {};    // date -> amount
+
+    // ---- 1. Daily Collection CSV ----
+    const dailyRows = await readCSVRows(dailyFile);
+    let dHeaderSkipped = false;
+    for (const r of dailyRows) {
+      if (!dHeaderSkipped) { dHeaderSkipped = true; continue; }
+      if (r.length < 10) continue;
+      const dateStr = (r[1] || '').trim();
+      const cash = parseFloat(r[2]) || 0;
+      const cheque = parseFloat(r[3]) || 0;
+      const cid = (r[8] || '').trim();
+      const billType = (r[9] || '').trim();
+      if (!targetIds.has(cid)) continue;
+      const d = new Date(dateStr);
+      const key = dateKey(d);
+      if (!key) continue;
+      if (billType === 'ENERGY BILL') {
+        energy[key] = energy[key] || { cash: 0, cheque: 0 };
+        energy[key].cash += cash;
+        energy[key].cheque += cheque;
+      } else if (billType === 'FINAL ASSESSMENT BILL') {
+        assess[key] = (assess[key] || 0) + cash + cheque;
+      } else if (billType === 'DISCONNECTION RECONNECTION CHARGE') {
+        rcdcDaily[key] = (rcdcDaily[key] || 0) + cash + cheque;
+      }
+    }
+    setStatus('daily', `${dailyRows.length - 1} rows read`);
+
+    // ---- 2. HeadWise Collection Report ----
+    const meterCost = {};      // date -> amount
+    const rcdcHeadwise = {};   // date -> amount
+    const miscHeadwise = {};   // date -> amount
+    const RCDC_HEADS = new Set(['DISCONNECTION RECONNECTION CHARGE', 'NEW SERVICE CONNECTION DISCONNECTION CHARGE']);
+
+    const hwWb = await readWorkbook(headwiseFile);
+    let hwRowCount = 0;
+    for (const sheetName of hwWb.SheetNames) {
+      const sheet = hwWb.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: null });
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || row.length < 10) continue;
+        const billHead = row[6] ? String(row[6]).trim() : null;
+        const amount = typeof row[7] === 'number' ? row[7] : parseFloat(row[7]);
+        const payDate = parseExcelDate(row[8]);
+        const receivedBy = row[9] ? String(row[9]).trim() : null;
+        if (!billHead || isNaN(amount) || !payDate || !receivedBy) continue;
+        if (!targetIds.has(receivedBy)) continue;
+        const key = dateKey(payDate);
+        hwRowCount++;
+        if (billHead === 'TEMPORARY SERVICE CONNECTION ENERGY CHARGE') continue;
+        if (billHead.includes('METER COST')) {
+          if (amount === 2400 || amount === 6000) continue;
+          meterCost[key] = (meterCost[key] || 0) + amount;
+        } else if (RCDC_HEADS.has(billHead)) {
+          rcdcHeadwise[key] = (rcdcHeadwise[key] || 0) + amount;
+        } else {
+          miscHeadwise[key] = (miscHeadwise[key] || 0) + amount;
+        }
+      }
+    }
+    setStatus('headwise', `${hwRowCount} matching rows`);
+
+    // ---- 3. Smart Prepaid Recharge Report(s) ----
+    const spCash = {};
+    const spCheque = {};
+    let spRowCount = 0;
+    for (const file of spFiles) {
+      const wb = await readWorkbook(file);
+      for (const sheetName of wb.SheetNames) {
+        const sheet = wb.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: null });
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i];
+          if (!row || row.length < 11) continue;
+          const mode = row[2] ? String(row[2]).trim() : null;
+          const amount = typeof row[3] === 'number' ? row[3] : parseFloat(row[3]);
+          const payDate = parseExcelDate(row[4]);
+          const cid = row[10] ? String(row[10]).trim() : null;
+          if (!mode || isNaN(amount) || !payDate || !cid) continue;
+          if (!targetIds.has(cid)) continue;
+          const key = dateKey(payDate);
+          spRowCount++;
+          if (mode === 'cash' || mode === 'cash_os') {
+            spCash[key] = (spCash[key] || 0) + amount;
+          } else if (mode === 'cheque') {
+            spCheque[key] = (spCheque[key] || 0) + amount;
+          }
+        }
+      }
+    }
+    setStatus('smartprepaid', `${spRowCount} matching rows across ${spFiles.length} file(s)`);
+
+    // ---- Build date range (min to max across all data) ----
+    const allKeys = new Set([
+      ...Object.keys(energy), ...Object.keys(assess), ...Object.keys(rcdcDaily),
+      ...Object.keys(meterCost), ...Object.keys(rcdcHeadwise), ...Object.keys(miscHeadwise),
+      ...Object.keys(spCash), ...Object.keys(spCheque)
+    ]);
+    if (allKeys.size === 0) {
+      setStatus('msg', 'No matching data found for the given Collector IDs. Please check the IDs and files.', true);
+      document.getElementById('processBtn').disabled = false;
+      return;
+    }
+    const sortedKeys = [...allKeys].sort();
+    const minDate = new Date(sortedKeys[0]);
+    const maxDate = new Date(sortedKeys[sortedKeys.length - 1]);
+
+    const rows = [];
+    let cur = new Date(Date.UTC(minDate.getUTCFullYear(), minDate.getUTCMonth(), minDate.getUTCDate()));
+    const endD = new Date(Date.UTC(maxDate.getUTCFullYear(), maxDate.getUTCMonth(), maxDate.getUTCDate()));
+    while (cur <= endD) {
+      const key = dateKey(cur);
+      const eCash = (energy[key] && energy[key].cash) || 0;
+      const eCheque = (energy[key] && energy[key].cheque) || 0;
+      const spC = spCash[key] || 0;
+      const spCh = spCheque[key] || 0;
+      const a = assess[key] || 0;
+      const rcdc = (rcdcDaily[key] || 0) + (rcdcHeadwise[key] || 0);
+      const mc = meterCost[key] || 0;
+      const misc = miscHeadwise[key] || 0;
+      const total = eCash + eCheque + spC + spCh + a + rcdc + mc + misc;
+      const revAc = eCash + eCheque + a + spC + spCh;
+      const rcdcAc = rcdc;
+      const dwAc = mc + misc;
+      rows.push({ date: new Date(cur), eCash, eCheque, spC, spCh, a, rcdc, mc, misc, total, revAc, rcdcAc, dwAc });
+      cur = new Date(cur.getTime() + 24 * 60 * 60 * 1000);
+    }
+
+    computedData = { rows };
+    renderResults(rows);
+    setStatus('msg', `Done — ${rows.length} days processed.`);
+  } catch (err) {
+    console.error(err);
+    setStatus('msg', 'Error while processing files: ' + err.message, true);
+  } finally {
+    document.getElementById('processBtn').disabled = false;
+  }
+}
+
+function fmt(n) {
+  if (!n) return '';
+  return Math.round(n).toLocaleString('en-IN');
+}
+
+function renderResults(rows) {
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = '';
+  const g = { eCash:0, eCheque:0, spC:0, spCh:0, a:0, rcdc:0, mc:0, misc:0, total:0, revAc:0, rcdcAc:0, dwAc:0 };
+
+  for (const r of rows) {
+    for (const k in g) g[k] += r[k];
+    const tr = document.createElement('tr');
+    const dstr = r.date.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'2-digit', timeZone: 'UTC' });
+    tr.innerHTML = `
+      <td>${dstr}</td>
+      <td class="num">${fmt(r.eCash)}</td>
+      <td class="num">${fmt(r.eCheque)}</td>
+      <td class="num">${fmt(r.spC)}</td>
+      <td class="num">${fmt(r.spCh)}</td>
+      <td class="num">${fmt(r.a)}</td>
+      <td class="num">${fmt(r.rcdc)}</td>
+      <td class="num">${fmt(r.mc)}</td>
+      <td class="num">${fmt(r.misc)}</td>
+      <td class="num total-col">${fmt(r.total)}</td>
+      <td class="num">${fmt(r.revAc)}</td>
+      <td class="num">${fmt(r.rcdcAc)}</td>
+      <td class="num">${fmt(r.dwAc)}</td>
+      <td class="num total-col">${fmt(r.total)}</td>`;
+    tbody.appendChild(tr);
+  }
+
+  const totalTr = document.createElement('tr');
+  totalTr.className = 'grand-total';
+  totalTr.innerHTML = `
+    <td>TOTAL</td>
+    <td class="num">${fmt(g.eCash)}</td>
+    <td class="num">${fmt(g.eCheque)}</td>
+    <td class="num">${fmt(g.spC)}</td>
+    <td class="num">${fmt(g.spCh)}</td>
+    <td class="num">${fmt(g.a)}</td>
+    <td class="num">${fmt(g.rcdc)}</td>
+    <td class="num">${fmt(g.mc)}</td>
+    <td class="num">${fmt(g.misc)}</td>
+    <td class="num total-col">${fmt(g.total)}</td>
+    <td class="num">${fmt(g.revAc)}</td>
+    <td class="num">${fmt(g.rcdcAc)}</td>
+    <td class="num">${fmt(g.dwAc)}</td>
+    <td class="num total-col">${fmt(g.total)}</td>`;
+  tbody.appendChild(totalTr);
+
+  const metaCards = document.getElementById('metaCards');
+  metaCards.innerHTML = `
+    <div class="card"><div class="label">Energy Bill</div><div class="value">₹${fmt(g.eCash+g.eCheque)}</div></div>
+    <div class="card"><div class="label">Smart Prepaid</div><div class="value">₹${fmt(g.spC+g.spCh)}</div></div>
+    <div class="card"><div class="label">Assessment</div><div class="value">₹${fmt(g.a)}</div></div>
+    <div class="card"><div class="label">RC/DC</div><div class="value">₹${fmt(g.rcdc)}</div></div>
+    <div class="card"><div class="label">Meter Cost</div><div class="value">₹${fmt(g.mc)}</div></div>
+    <div class="card"><div class="label">Grand Total</div><div class="value">₹${fmt(g.total)}</div></div>`;
+
+  document.getElementById('resultsSection').style.display = 'block';
+}
+
+function downloadExcel() {
+  if (!computedData) return;
+  const rows = computedData.rows;
+
+  const aoa = [];
+  // Row 1
+  const r1 = new Array(14).fill(null);
+  r1[0] = 'DATE'; r1[1] = 'Collection'; r1[10] = 'Deposite';
+  aoa.push(r1);
+  // Row 2
+  const r2 = new Array(14).fill(null);
+  r2[1]='ENERGY BILL'; r2[3]='Smart Prepaid'; r2[5]='Assessment'; r2[6]='RC/DC';
+  r2[7]='Meter Cost'; r2[8]='Misc'; r2[9]='Total';
+  r2[10]='Rev Ac'; r2[11]='RC/DC AC'; r2[12]='DW AC'; r2[13]='Total';
+  aoa.push(r2);
+  // Row 3
+  const r3 = new Array(14).fill(null);
+  r3[1]='cash'; r3[2]='Cheque'; r3[3]='cash'; r3[4]='Cheque';
+  aoa.push(r3);
+
+  let gTotal = new Array(13).fill(0);
+  for (const r of rows) {
+    const vals = [r.eCash, r.eCheque, r.spC, r.spCh, r.a, r.rcdc, r.mc, r.misc, r.total, r.revAc, r.rcdcAc, r.dwAc, r.total];
+    aoa.push([r.date, ...vals.map(v => v || null)]);
+    vals.forEach((v,i) => gTotal[i] += (v||0));
+  }
+  aoa.push(['TOTAL', ...gTotal]);
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!merges'] = [
+    { s:{r:0,c:0}, e:{r:2,c:0} },   // DATE
+    { s:{r:0,c:1}, e:{r:0,c:9} },   // Collection
+    { s:{r:0,c:10}, e:{r:0,c:13} }, // Deposite
+    { s:{r:1,c:1}, e:{r:1,c:2} },   // ENERGY BILL
+    { s:{r:1,c:3}, e:{r:1,c:4} },   // Smart Prepaid
+    { s:{r:1,c:5}, e:{r:2,c:5} },   // Assessment
+    { s:{r:1,c:6}, e:{r:2,c:6} },   // RC/DC
+    { s:{r:1,c:7}, e:{r:2,c:7} },   // Meter Cost
+    { s:{r:1,c:8}, e:{r:2,c:8} },   // Misc
+    { s:{r:1,c:9}, e:{r:2,c:9} },   // Total
+    { s:{r:1,c:10}, e:{r:2,c:10} }, // Rev Ac
+    { s:{r:1,c:11}, e:{r:2,c:11} }, // RC/DC AC
+    { s:{r:1,c:12}, e:{r:2,c:12} }, // DW AC
+    { s:{r:1,c:13}, e:{r:2,c:13} }, // Total
+  ];
+  ws['!cols'] = new Array(14).fill({ wch: 12 });
+
+  for (let i = 3; i < aoa.length - 1; i++) {
+    const cellRef = XLSX.utils.encode_cell({ r: i, c: 0 });
+    if (ws[cellRef]) {
+      ws[cellRef].t = 'd';
+      ws[cellRef].z = 'dd-mmm-yy';
+    }
+  }
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+
+  const now = new Date();
+  const fname = `coll_${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}.xlsx`;
+  XLSX.writeFile(wb, fname);
+}
+
+['file-daily','file-headwise','file-smartprepaid'].forEach(id => {
+  document.getElementById(id).addEventListener('change', function() {
+    const slotId = id.replace('file-', 'slot-');
+    const slot = document.getElementById(slotId);
+    if (this.files.length > 0) slot.classList.add('filled');
+    else slot.classList.remove('filled');
+  });
+});
 </script>
 </body>
 </html>
