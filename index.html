@@ -125,7 +125,7 @@
     <div class="table-scroll">
     <table id="collTable">
       <thead>
-        <tr class="section-row">
+        <tr class="section-row" id="sectionHeaderRow">
           <th rowspan="3">DATE</th>
           <th colspan="9">Collection</th>
           <th colspan="4">Deposite</th>
@@ -152,8 +152,10 @@
     </table>
     </div>
     <div style="color:var(--muted); font-size:0.78rem; margin-top:6px;">
-      "Temporary" = Temporary Energy Charge + Meter Cost entries of exactly ₹2,400 / ₹6,000 from the HeadWise report — kept aside, not part of any Collection/Deposite total.
+      "Temporary" = Temporary Energy Charge + Meter Cost entries of exactly ₹2,400 / ₹6,000 from the HeadWise report — kept aside, not part of any Collection/Deposite total.<br>
+      The last columns (one per Collector ID) show that collector's own total collection — Energy Bill + Assessment + RC/DC from Daily Collection, plus Smart Prepaid — for the day.
     </div>
+
 
     <footer>
       RC/DC = Daily Collection (Disconnection/Reconnection Charge) + HeadWise (Disconnection Reconnection Charge + New Service Connection Disconnection Charge).<br>
@@ -269,6 +271,9 @@ async function processFiles() {
     const energy = {};       // date -> {cash, cheque}
     const assess = {};       // date -> amount
     const rcdcDaily = {};    // date -> amount
+    const perIdTotal = {};   // collectorId -> date -> amount (Daily CSV filtered categories + Smart Prepaid)
+    const targetIdList = [...targetIds];
+    for (const id of targetIdList) perIdTotal[id] = {};
 
     // ---- 1. Daily Collection CSV ----
     const dailyRows = await readCSVRows(dailyFile);
@@ -288,10 +293,13 @@ async function processFiles() {
         energy[key] = energy[key] || { cash: 0, cheque: 0 };
         energy[key].cash += cash;
         energy[key].cheque += cheque;
+        perIdTotal[cid][key] = (perIdTotal[cid][key] || 0) + cash + cheque;
       } else if (billType === 'FINAL ASSESSMENT BILL') {
         assess[key] = (assess[key] || 0) + cash + cheque;
+        perIdTotal[cid][key] = (perIdTotal[cid][key] || 0) + cash + cheque;
       } else if (billType === 'DISCONNECTION RECONNECTION CHARGE') {
         rcdcDaily[key] = (rcdcDaily[key] || 0) + cash + cheque;
+        perIdTotal[cid][key] = (perIdTotal[cid][key] || 0) + cash + cheque;
       }
     }
     setStatus('daily', `${dailyRows.length - 1} rows read`);
@@ -358,8 +366,10 @@ async function processFiles() {
           spRowCount++;
           if (mode === 'cash' || mode === 'cash_os') {
             spCash[key] = (spCash[key] || 0) + amount;
+            perIdTotal[cid][key] = (perIdTotal[cid][key] || 0) + amount;
           } else if (mode === 'cheque') {
             spCheque[key] = (spCheque[key] || 0) + amount;
+            perIdTotal[cid][key] = (perIdTotal[cid][key] || 0) + amount;
           }
         }
       }
@@ -399,12 +409,14 @@ async function processFiles() {
       const rcdcAc = rcdc;
       const dwAc = mc + misc;
       const excluded = excludedHeadwise[key] || 0;
-      rows.push({ date: new Date(cur), eCash, eCheque, spC, spCh, a, rcdc, mc, misc, total, revAc, rcdcAc, dwAc, excluded });
+      const idTotals = {};
+      for (const id of targetIdList) idTotals[id] = perIdTotal[id][key] || 0;
+      rows.push({ date: new Date(cur), eCash, eCheque, spC, spCh, a, rcdc, mc, misc, total, revAc, rcdcAc, dwAc, excluded, idTotals });
       cur = new Date(cur.getTime() + 24 * 60 * 60 * 1000);
     }
 
-    computedData = { rows };
-    renderResults(rows);
+    computedData = { rows, targetIdList };
+    renderResults(rows, targetIdList);
     setStatus('msg', `Done — ${rows.length} days processed.`);
   } catch (err) {
     console.error(err);
@@ -418,15 +430,31 @@ function fmt(n) {
   return Math.round(n || 0).toLocaleString('en-IN');
 }
 
-function renderResults(rows) {
+function renderResults(rows, targetIdList) {
+  // Rebuild the dynamic per-collector-ID header columns (Daily Collection +
+  // Smart Prepaid total for that ID), removing any from a previous run.
+  const sectionHeaderRow = document.getElementById('sectionHeaderRow');
+  sectionHeaderRow.querySelectorAll('.id-col-header').forEach(el => el.remove());
+  for (const id of targetIdList) {
+    const th = document.createElement('th');
+    th.rowSpan = 3;
+    th.className = 'id-col-header';
+    th.textContent = id;
+    sectionHeaderRow.appendChild(th);
+  }
+
   const tbody = document.getElementById('tableBody');
   tbody.innerHTML = '';
   const g = { eCash:0, eCheque:0, spC:0, spCh:0, a:0, rcdc:0, mc:0, misc:0, total:0, revAc:0, rcdcAc:0, dwAc:0, excluded:0 };
+  const gId = {};
+  for (const id of targetIdList) gId[id] = 0;
 
   for (const r of rows) {
     for (const k in g) g[k] += (r[k] || 0);
+    for (const id of targetIdList) gId[id] += (r.idTotals[id] || 0);
     const tr = document.createElement('tr');
     const dstr = r.date.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'2-digit', timeZone: 'UTC' });
+    const idCells = targetIdList.map(id => `<td class="num">${fmt(r.idTotals[id])}</td>`).join('');
     tr.innerHTML = `
       <td>${dstr}</td>
       <td class="num">${fmt(r.eCash)}</td>
@@ -442,10 +470,12 @@ function renderResults(rows) {
       <td class="num">${fmt(r.rcdcAc)}</td>
       <td class="num">${fmt(r.dwAc)}</td>
       <td class="num total-col">${fmt(r.total)}</td>
-      <td class="num">${fmt(r.excluded)}</td>`;
+      <td class="num">${fmt(r.excluded)}</td>
+      ${idCells}`;
     tbody.appendChild(tr);
   }
 
+  const totalIdCells = targetIdList.map(id => `<td class="num">${fmt(gId[id])}</td>`).join('');
   const totalTr = document.createElement('tr');
   totalTr.className = 'grand-total';
   totalTr.innerHTML = `
@@ -463,17 +493,20 @@ function renderResults(rows) {
     <td class="num">${fmt(g.rcdcAc)}</td>
     <td class="num">${fmt(g.dwAc)}</td>
     <td class="num total-col">${fmt(g.total)}</td>
-    <td class="num">${fmt(g.excluded)}</td>`;
+    <td class="num">${fmt(g.excluded)}</td>
+    ${totalIdCells}`;
   tbody.appendChild(totalTr);
 
   const metaCards = document.getElementById('metaCards');
+  const idCards = targetIdList.map(id => `<div class="card"><div class="label">ID ${id}</div><div class="value">₹${fmt(gId[id])}</div></div>`).join('');
   metaCards.innerHTML = `
     <div class="card"><div class="label">Energy Bill</div><div class="value">₹${fmt(g.eCash+g.eCheque)}</div></div>
     <div class="card"><div class="label">Smart Prepaid</div><div class="value">₹${fmt(g.spC+g.spCh)}</div></div>
     <div class="card"><div class="label">Assessment</div><div class="value">₹${fmt(g.a)}</div></div>
     <div class="card"><div class="label">RC/DC</div><div class="value">₹${fmt(g.rcdc)}</div></div>
     <div class="card"><div class="label">Meter Cost</div><div class="value">₹${fmt(g.mc)}</div></div>
-    <div class="card"><div class="label">Grand Total</div><div class="value">₹${fmt(g.total)}</div></div>`;
+    <div class="card"><div class="label">Grand Total</div><div class="value">₹${fmt(g.total)}</div></div>
+    ${idCards}`;
 
   document.getElementById('resultsSection').style.display = 'block';
 }
@@ -481,6 +514,7 @@ function renderResults(rows) {
 async function downloadExcel() {
   if (!computedData) return;
   const rows = computedData.rows;
+  const targetIdList = computedData.targetIdList || [];
   const btn = document.querySelector('.btn-row .btn.secondary');
   if (btn) { btn.disabled = true; btn.textContent = 'Building file...'; }
 
@@ -491,11 +525,13 @@ async function downloadExcel() {
     // format — a plain "#,##,##0" doesn't scale correctly once a value
     // crosses into lakhs in most Excel versions, so we branch by size.
     const INR_FMT = '[>9999999]##\\,##\\,##\\,##0;[>99999]##\\,##\\,##0;##,##0';
+    const totalCols = 14 + 1 + targetIdList.length; // A..N (14) + Temporary (O) + one per collector ID
 
     ws.columns = [
       { width: 12 }, { width: 10 }, { width: 10 }, { width: 10 }, { width: 10 },
       { width: 11 }, { width: 9 },  { width: 11 }, { width: 9 },  { width: 12 },
       { width: 11 }, { width: 11 }, { width: 10 }, { width: 12 }, { width: 13 },
+      ...targetIdList.map(() => ({ width: 13 })),
     ];
 
     const thinBorder = {
@@ -542,13 +578,25 @@ async function downloadExcel() {
     ws.getCell('D3').value = 'cash';
     ws.getCell('E3').value = 'Cheque';
 
+    // Dynamic trailing columns: one per collector ID (P, Q, ... depending on count)
+    function colLetter(n) { // 1-indexed
+      let s = '';
+      while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); }
+      return s;
+    }
+    const idColLetters = targetIdList.map((_, i) => colLetter(16 + i)); // 16 = column P
+    idColLetters.forEach((col, i) => {
+      ws.mergeCells(`${col}1:${col}3`);
+      ws.getCell(`${col}1`).value = targetIdList[i];
+    });
+
     for (let r = 1; r <= 3; r++) {
       const row = ws.getRow(r);
       row.height = 20;
-      for (let c = 1; c <= 15; c++) {
+      for (let c = 1; c <= totalCols; c++) {
         const cell = row.getCell(c);
         cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c === 15 ? 'FF5A3B1C' : (c >= 11 ? 'FF1F3B2C' : 'FF1C2733') } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c > 15 ? 'FF203A5C' : (c === 15 ? 'FF5A3B1C' : (c >= 11 ? 'FF1F3B2C' : 'FF1C2733')) } };
         cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
         cell.border = thinBorder;
       }
@@ -577,8 +625,11 @@ async function downloadExcel() {
         }
       }
       excelRow.getCell(15).value = Math.round(row.excluded || 0);
+      idColLetters.forEach((col, i) => {
+        excelRow.getCell(col).value = Math.round(row.idTotals[targetIdList[i]] || 0);
+      });
 
-      for (let c = 1; c <= 15; c++) {
+      for (let c = 1; c <= totalCols; c++) {
         const cell = excelRow.getCell(c);
         cell.border = thinBorder;
         if (c === 1) {
@@ -589,6 +640,7 @@ async function downloadExcel() {
           cell.alignment = { horizontal: 'right' };
           if (c === 10 || c === 14) cell.font = { bold: true, color: { argb: 'FF1F5FBF' } };
           if (c === 15) cell.font = { italic: true, color: { argb: 'FF8A5A2B' } };
+          if (c > 15) cell.font = { color: { argb: 'FF204A87' } };
         }
         if (r % 2 === 0) {
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F6FA' } };
@@ -601,13 +653,13 @@ async function downloadExcel() {
     // ---- Total row (also live SUM formulas, one per column) ----
     const totalRow = ws.getRow(r);
     totalRow.getCell(1).value = 'TOTAL';
-    ['B','C','D','E','F','G','H','I','K','L','M','O'].forEach(col => {
+    ['B','C','D','E','F','G','H','I','K','L','M','O', ...idColLetters].forEach(col => {
       totalRow.getCell(col).value = { formula: `SUM(${col}${firstDataRow}:${col}${lastDataRow})` };
     });
     totalRow.getCell('J').value = { formula: `SUM(B${r}:I${r})` };
     totalRow.getCell('N').value = { formula: `SUM(K${r}:M${r})` };
 
-    for (let c = 1; c <= 15; c++) {
+    for (let c = 1; c <= totalCols; c++) {
       const cell = totalRow.getCell(c);
       cell.font = { bold: true, color: { argb: c === 15 ? 'FF6B3E12' : 'FF0B3D19' } };
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c === 15 ? 'FFF3E0C8' : 'FFCFEFD7' } };
