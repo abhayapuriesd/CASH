@@ -129,7 +129,7 @@
           <th rowspan="3">DATE</th>
           <th colspan="9">Collection</th>
           <th colspan="4">Deposite</th>
-          <th rowspan="3">Excluded</th>
+          <th rowspan="3">Temporary</th>
         </tr>
         <tr>
           <th colspan="2">ENERGY BILL</th>
@@ -152,7 +152,7 @@
     </table>
     </div>
     <div style="color:var(--muted); font-size:0.78rem; margin-top:6px;">
-      "Excluded" = Temporary Energy Charge + Meter Cost entries of exactly ₹2,400 / ₹6,000 from the HeadWise report — kept aside, not part of any Collection/Deposite total.
+      "Temporary" = Temporary Energy Charge + Meter Cost entries of exactly ₹2,400 / ₹6,000 from the HeadWise report — kept aside, not part of any Collection/Deposite total.
     </div>
 
     <footer>
@@ -525,7 +525,7 @@ async function downloadExcel() {
     ws.getCell('A1').value = 'DATE';
     ws.getCell('B1').value = 'Collection';
     ws.getCell('K1').value = 'Deposite';
-    ws.getCell('O1').value = 'Excluded';
+    ws.getCell('O1').value = 'Temporary';
     ws.getCell('B2').value = 'ENERGY BILL';
     ws.getCell('D2').value = 'Smart Prepaid';
     ws.getCell('F2').value = 'Assessment';
@@ -602,10 +602,10 @@ async function downloadExcel() {
     const totalRow = ws.getRow(r);
     totalRow.getCell(1).value = 'TOTAL';
     ['B','C','D','E','F','G','H','I','K','L','M','O'].forEach(col => {
-      totalRow.getCell(col + String(r)).value = { formula: `SUM(${col}${firstDataRow}:${col}${lastDataRow})` };
+      totalRow.getCell(col).value = { formula: `SUM(${col}${firstDataRow}:${col}${lastDataRow})` };
     });
-    totalRow.getCell('J' + r).value = { formula: `SUM(B${r}:I${r})` };
-    totalRow.getCell('N' + r).value = { formula: `SUM(K${r}:M${r})` };
+    totalRow.getCell('J').value = { formula: `SUM(B${r}:I${r})` };
+    totalRow.getCell('N').value = { formula: `SUM(K${r}:M${r})` };
 
     for (let c = 1; c <= 15; c++) {
       const cell = totalRow.getCell(c);
