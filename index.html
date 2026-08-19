@@ -130,6 +130,7 @@
           <th colspan="9">Collection</th>
           <th colspan="4">Deposite</th>
           <th rowspan="3">Temporary</th>
+          <th rowspan="3">Total Collection<br>(ID-wise)</th>
         </tr>
         <tr>
           <th colspan="2">ENERGY BILL</th>
@@ -153,8 +154,9 @@
     </div>
     <div style="color:var(--muted); font-size:0.78rem; margin-top:6px;">
       "Temporary" = Temporary Energy Charge + Meter Cost entries of exactly ₹2,400 / ₹6,000 from the HeadWise report — kept aside, not part of any Collection/Deposite total.<br>
-      The last columns (one per Collector ID) show that collector's own total collection — Energy Bill + Assessment + RC/DC from Daily Collection, plus Smart Prepaid — for the day.
+      "Total Collection (ID-wise)" = everything for Collector IDs <span id="idListLabel"></span> combined — every bill type from Daily Collection (Energy Bill, Assessment, RC/DC, New Service Connection, Testing, Change Process, Meter Seal, all of it) plus every payment mode from Smart Prepaid. Nothing excluded; not split by category.
     </div>
+
 
 
     <footer>
@@ -271,9 +273,10 @@ async function processFiles() {
     const energy = {};       // date -> {cash, cheque}
     const assess = {};       // date -> amount
     const rcdcDaily = {};    // date -> amount
-    const perIdTotal = {};   // collectorId -> date -> amount (Daily CSV filtered categories + Smart Prepaid)
-    const targetIdList = [...targetIds];
-    for (const id of targetIdList) perIdTotal[id] = {};
+    const rawTotal = {};     // date -> amount — EVERYTHING for the target IDs (both combined), no
+                              // bill-type filtering at all: every row, every amount column from Daily
+                              // Collection (Energy, Assessment, RC/DC, New Service Connection, Testing,
+                              // Change Process, Meter Seal, everything) + every payment mode from Smart Prepaid.
 
     // ---- 1. Daily Collection CSV ----
     const dailyRows = await readCSVRows(dailyFile);
@@ -284,22 +287,25 @@ async function processFiles() {
       const dateStr = (r[1] || '').trim();
       const cash = parseFloat(r[2]) || 0;
       const cheque = parseFloat(r[3]) || 0;
+      const rtgs = parseFloat(r[4]) || 0;
+      const govtAdj = parseFloat(r[5]) || 0;
+      const boardAdj = parseFloat(r[6]) || 0;
+      const towerAdj = parseFloat(r[7]) || 0;
       const cid = (r[8] || '').trim();
       const billType = (r[9] || '').trim();
       if (!targetIds.has(cid)) continue;
       const key = cellDateToKey(dateStr);
       if (!key) continue;
+      // Unfiltered: every row for this collector counts here, regardless of bill type.
+      rawTotal[key] = (rawTotal[key] || 0) + cash + cheque + rtgs + govtAdj + boardAdj + towerAdj;
       if (billType === 'ENERGY BILL') {
         energy[key] = energy[key] || { cash: 0, cheque: 0 };
         energy[key].cash += cash;
         energy[key].cheque += cheque;
-        perIdTotal[cid][key] = (perIdTotal[cid][key] || 0) + cash + cheque;
       } else if (billType === 'FINAL ASSESSMENT BILL') {
         assess[key] = (assess[key] || 0) + cash + cheque;
-        perIdTotal[cid][key] = (perIdTotal[cid][key] || 0) + cash + cheque;
       } else if (billType === 'DISCONNECTION RECONNECTION CHARGE') {
         rcdcDaily[key] = (rcdcDaily[key] || 0) + cash + cheque;
-        perIdTotal[cid][key] = (perIdTotal[cid][key] || 0) + cash + cheque;
       }
     }
     setStatus('daily', `${dailyRows.length - 1} rows read`);
@@ -364,12 +370,12 @@ async function processFiles() {
           if (!mode || isNaN(amount) || !key || !cid) continue;
           if (!targetIds.has(cid)) continue;
           spRowCount++;
+          // Unfiltered: every payment mode counts towards the raw total (cash, cheque, rtgs, adjustments — everything).
+          rawTotal[key] = (rawTotal[key] || 0) + amount;
           if (mode === 'cash' || mode === 'cash_os') {
             spCash[key] = (spCash[key] || 0) + amount;
-            perIdTotal[cid][key] = (perIdTotal[cid][key] || 0) + amount;
           } else if (mode === 'cheque') {
             spCheque[key] = (spCheque[key] || 0) + amount;
-            perIdTotal[cid][key] = (perIdTotal[cid][key] || 0) + amount;
           }
         }
       }
@@ -380,7 +386,8 @@ async function processFiles() {
     const allKeys = new Set([
       ...Object.keys(energy), ...Object.keys(assess), ...Object.keys(rcdcDaily),
       ...Object.keys(meterCost), ...Object.keys(rcdcHeadwise), ...Object.keys(miscHeadwise),
-      ...Object.keys(spCash), ...Object.keys(spCheque), ...Object.keys(excludedHeadwise)
+      ...Object.keys(spCash), ...Object.keys(spCheque), ...Object.keys(excludedHeadwise),
+      ...Object.keys(rawTotal)
     ]);
     if (allKeys.size === 0) {
       setStatus('msg', 'No matching data found for the given Collector IDs. Please check the IDs and files.', true);
@@ -409,14 +416,13 @@ async function processFiles() {
       const rcdcAc = rcdc;
       const dwAc = mc + misc;
       const excluded = excludedHeadwise[key] || 0;
-      const idTotals = {};
-      for (const id of targetIdList) idTotals[id] = perIdTotal[id][key] || 0;
-      rows.push({ date: new Date(cur), eCash, eCheque, spC, spCh, a, rcdc, mc, misc, total, revAc, rcdcAc, dwAc, excluded, idTotals });
+      const rawColl = rawTotal[key] || 0;
+      rows.push({ date: new Date(cur), eCash, eCheque, spC, spCh, a, rcdc, mc, misc, total, revAc, rcdcAc, dwAc, excluded, rawColl });
       cur = new Date(cur.getTime() + 24 * 60 * 60 * 1000);
     }
 
-    computedData = { rows, targetIdList };
-    renderResults(rows, targetIdList);
+    computedData = { rows };
+    renderResults(rows);
     setStatus('msg', `Done — ${rows.length} days processed.`);
   } catch (err) {
     console.error(err);
@@ -430,31 +436,17 @@ function fmt(n) {
   return Math.round(n || 0).toLocaleString('en-IN');
 }
 
-function renderResults(rows, targetIdList) {
-  // Rebuild the dynamic per-collector-ID header columns (Daily Collection +
-  // Smart Prepaid total for that ID), removing any from a previous run.
-  const sectionHeaderRow = document.getElementById('sectionHeaderRow');
-  sectionHeaderRow.querySelectorAll('.id-col-header').forEach(el => el.remove());
-  for (const id of targetIdList) {
-    const th = document.createElement('th');
-    th.rowSpan = 3;
-    th.className = 'id-col-header';
-    th.textContent = id;
-    sectionHeaderRow.appendChild(th);
-  }
+function renderResults(rows) {
+  document.getElementById('idListLabel').textContent = getTargetIds().join(', ');
 
   const tbody = document.getElementById('tableBody');
   tbody.innerHTML = '';
-  const g = { eCash:0, eCheque:0, spC:0, spCh:0, a:0, rcdc:0, mc:0, misc:0, total:0, revAc:0, rcdcAc:0, dwAc:0, excluded:0 };
-  const gId = {};
-  for (const id of targetIdList) gId[id] = 0;
+  const g = { eCash:0, eCheque:0, spC:0, spCh:0, a:0, rcdc:0, mc:0, misc:0, total:0, revAc:0, rcdcAc:0, dwAc:0, excluded:0, rawColl:0 };
 
   for (const r of rows) {
     for (const k in g) g[k] += (r[k] || 0);
-    for (const id of targetIdList) gId[id] += (r.idTotals[id] || 0);
     const tr = document.createElement('tr');
     const dstr = r.date.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'2-digit', timeZone: 'UTC' });
-    const idCells = targetIdList.map(id => `<td class="num">${fmt(r.idTotals[id])}</td>`).join('');
     tr.innerHTML = `
       <td>${dstr}</td>
       <td class="num">${fmt(r.eCash)}</td>
@@ -471,11 +463,10 @@ function renderResults(rows, targetIdList) {
       <td class="num">${fmt(r.dwAc)}</td>
       <td class="num total-col">${fmt(r.total)}</td>
       <td class="num">${fmt(r.excluded)}</td>
-      ${idCells}`;
+      <td class="num total-col">${fmt(r.rawColl)}</td>`;
     tbody.appendChild(tr);
   }
 
-  const totalIdCells = targetIdList.map(id => `<td class="num">${fmt(gId[id])}</td>`).join('');
   const totalTr = document.createElement('tr');
   totalTr.className = 'grand-total';
   totalTr.innerHTML = `
@@ -494,11 +485,10 @@ function renderResults(rows, targetIdList) {
     <td class="num">${fmt(g.dwAc)}</td>
     <td class="num total-col">${fmt(g.total)}</td>
     <td class="num">${fmt(g.excluded)}</td>
-    ${totalIdCells}`;
+    <td class="num total-col">${fmt(g.rawColl)}</td>`;
   tbody.appendChild(totalTr);
 
   const metaCards = document.getElementById('metaCards');
-  const idCards = targetIdList.map(id => `<div class="card"><div class="label">ID ${id}</div><div class="value">₹${fmt(gId[id])}</div></div>`).join('');
   metaCards.innerHTML = `
     <div class="card"><div class="label">Energy Bill</div><div class="value">₹${fmt(g.eCash+g.eCheque)}</div></div>
     <div class="card"><div class="label">Smart Prepaid</div><div class="value">₹${fmt(g.spC+g.spCh)}</div></div>
@@ -506,7 +496,7 @@ function renderResults(rows, targetIdList) {
     <div class="card"><div class="label">RC/DC</div><div class="value">₹${fmt(g.rcdc)}</div></div>
     <div class="card"><div class="label">Meter Cost</div><div class="value">₹${fmt(g.mc)}</div></div>
     <div class="card"><div class="label">Grand Total</div><div class="value">₹${fmt(g.total)}</div></div>
-    ${idCards}`;
+    <div class="card"><div class="label">Total Collection (ID-wise)</div><div class="value">₹${fmt(g.rawColl)}</div></div>`;
 
   document.getElementById('resultsSection').style.display = 'block';
 }
@@ -514,7 +504,6 @@ function renderResults(rows, targetIdList) {
 async function downloadExcel() {
   if (!computedData) return;
   const rows = computedData.rows;
-  const targetIdList = computedData.targetIdList || [];
   const btn = document.querySelector('.btn-row .btn.secondary');
   if (btn) { btn.disabled = true; btn.textContent = 'Building file...'; }
 
@@ -525,13 +514,13 @@ async function downloadExcel() {
     // format — a plain "#,##,##0" doesn't scale correctly once a value
     // crosses into lakhs in most Excel versions, so we branch by size.
     const INR_FMT = '[>9999999]##\\,##\\,##\\,##0;[>99999]##\\,##\\,##0;##,##0';
-    const totalCols = 14 + 1 + targetIdList.length; // A..N (14) + Temporary (O) + one per collector ID
+    const totalCols = 16; // A..N (14) + Temporary (O) + Total Collection ID-wise (P)
 
     ws.columns = [
       { width: 12 }, { width: 10 }, { width: 10 }, { width: 10 }, { width: 10 },
       { width: 11 }, { width: 9 },  { width: 11 }, { width: 9 },  { width: 12 },
       { width: 11 }, { width: 11 }, { width: 10 }, { width: 12 }, { width: 13 },
-      ...targetIdList.map(() => ({ width: 13 })),
+      { width: 16 },
     ];
 
     const thinBorder = {
@@ -546,6 +535,7 @@ async function downloadExcel() {
     ws.mergeCells('B1:J1');
     ws.mergeCells('K1:N1');
     ws.mergeCells('O1:O3');
+    ws.mergeCells('P1:P3');
     ws.mergeCells('B2:C2');
     ws.mergeCells('D2:E2');
     ws.mergeCells('F2:F3');
@@ -562,6 +552,7 @@ async function downloadExcel() {
     ws.getCell('B1').value = 'Collection';
     ws.getCell('K1').value = 'Deposite';
     ws.getCell('O1').value = 'Temporary';
+    ws.getCell('P1').value = 'Total Collection (ID-wise)';
     ws.getCell('B2').value = 'ENERGY BILL';
     ws.getCell('D2').value = 'Smart Prepaid';
     ws.getCell('F2').value = 'Assessment';
@@ -577,18 +568,6 @@ async function downloadExcel() {
     ws.getCell('C3').value = 'Cheque';
     ws.getCell('D3').value = 'cash';
     ws.getCell('E3').value = 'Cheque';
-
-    // Dynamic trailing columns: one per collector ID (P, Q, ... depending on count)
-    function colLetter(n) { // 1-indexed
-      let s = '';
-      while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); }
-      return s;
-    }
-    const idColLetters = targetIdList.map((_, i) => colLetter(16 + i)); // 16 = column P
-    idColLetters.forEach((col, i) => {
-      ws.mergeCells(`${col}1:${col}3`);
-      ws.getCell(`${col}1`).value = targetIdList[i];
-    });
 
     for (let r = 1; r <= 3; r++) {
       const row = ws.getRow(r);
@@ -625,9 +604,7 @@ async function downloadExcel() {
         }
       }
       excelRow.getCell(15).value = Math.round(row.excluded || 0);
-      idColLetters.forEach((col, i) => {
-        excelRow.getCell(col).value = Math.round(row.idTotals[targetIdList[i]] || 0);
-      });
+      excelRow.getCell(16).value = Math.round(row.rawColl || 0);
 
       for (let c = 1; c <= totalCols; c++) {
         const cell = excelRow.getCell(c);
@@ -638,9 +615,8 @@ async function downloadExcel() {
         } else {
           cell.numFmt = INR_FMT;
           cell.alignment = { horizontal: 'right' };
-          if (c === 10 || c === 14) cell.font = { bold: true, color: { argb: 'FF1F5FBF' } };
+          if (c === 10 || c === 14 || c === 16) cell.font = { bold: true, color: { argb: 'FF1F5FBF' } };
           if (c === 15) cell.font = { italic: true, color: { argb: 'FF8A5A2B' } };
-          if (c > 15) cell.font = { color: { argb: 'FF204A87' } };
         }
         if (r % 2 === 0) {
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F6FA' } };
@@ -653,7 +629,7 @@ async function downloadExcel() {
     // ---- Total row (also live SUM formulas, one per column) ----
     const totalRow = ws.getRow(r);
     totalRow.getCell(1).value = 'TOTAL';
-    ['B','C','D','E','F','G','H','I','K','L','M','O', ...idColLetters].forEach(col => {
+    ['B','C','D','E','F','G','H','I','K','L','M','O','P'].forEach(col => {
       totalRow.getCell(col).value = { formula: `SUM(${col}${firstDataRow}:${col}${lastDataRow})` };
     });
     totalRow.getCell('J').value = { formula: `SUM(B${r}:I${r})` };
