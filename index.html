@@ -131,6 +131,7 @@
           <th colspan="4">Deposite</th>
           <th rowspan="3">Temporary</th>
           <th rowspan="3">Total Collection<br>(ID-wise)</th>
+          <th rowspan="3">Balance</th>
         </tr>
         <tr>
           <th colspan="2">ENERGY BILL</th>
@@ -154,7 +155,8 @@
     </div>
     <div style="color:var(--muted); font-size:0.78rem; margin-top:6px;">
       "Temporary" = Temporary Energy Charge + Meter Cost entries of exactly ₹2,400 / ₹6,000 from the HeadWise report — kept aside, not part of any Collection/Deposite total.<br>
-      "Total Collection (ID-wise)" = everything for Collector IDs <span id="idListLabel"></span> combined — every bill type from Daily Collection (Energy Bill, Assessment, RC/DC, New Service Connection, Testing, Change Process, Meter Seal, all of it) plus every payment mode from Smart Prepaid. Nothing excluded; not split by category.
+      "Total Collection (ID-wise)" = everything for Collector IDs <span id="idListLabel"></span> combined — every bill type from Daily Collection (Energy Bill, Assessment, RC/DC, New Service Connection, Testing, Change Process, Meter Seal, all of it) plus every payment mode from Smart Prepaid. Nothing excluded; not split by category.<br>
+      "Balance" = Total Collection (ID-wise) − (Collection Total + Temporary).
     </div>
 
 
@@ -398,6 +400,26 @@ async function processFiles() {
     const minDate = keyToUTCDate(sortedKeys[0]);
     const maxDate = keyToUTCDate(sortedKeys[sortedKeys.length - 1]);
 
+    // Outlier check: a single mistyped date (e.g. Excel silently reinterprets
+    // "02-08-2026" typed into a date-formatted cell as 08-Feb instead of
+    // 02-Aug) creates a date isolated far from the rest of the data, which
+    // then drags the whole report's date range open with a long run of
+    // empty/zero days. Flag the largest gap between consecutive dates so the
+    // person can go fix the source file instead of quietly getting a
+    // stretched-out report.
+    let maxGapDays = 0, gapAt = -1;
+    for (let i = 1; i < sortedKeys.length; i++) {
+      const gap = Math.round((keyToUTCDate(sortedKeys[i]) - keyToUTCDate(sortedKeys[i - 1])) / 86400000);
+      if (gap > maxGapDays) { maxGapDays = gap; gapAt = i; }
+    }
+    let outlierWarning = '';
+    if (maxGapDays > 20 && sortedKeys.length > 1) {
+      const before = sortedKeys.slice(0, gapAt);
+      const after = sortedKeys.slice(gapAt);
+      const outliers = before.length <= after.length ? before : after;
+      outlierWarning = ` ⚠️ Warning: ${outliers.length} date(s) — ${outliers.slice(0, 3).join(', ')}${outliers.length > 3 ? '…' : ''} — sit ${maxGapDays} days away from the rest of the data. This usually means a date got typed wrong in one of your source files (Excel often silently reads "DD-MM-YYYY" as "MM-DD-YYYY" when you type into an already date-formatted cell). Please check and fix, then re-upload.`;
+    }
+
     const rows = [];
     let cur = new Date(minDate.getTime());
     const endD = new Date(maxDate.getTime());
@@ -417,13 +439,14 @@ async function processFiles() {
       const dwAc = mc + misc;
       const excluded = excludedHeadwise[key] || 0;
       const rawColl = rawTotal[key] || 0;
-      rows.push({ date: new Date(cur), eCash, eCheque, spC, spCh, a, rcdc, mc, misc, total, revAc, rcdcAc, dwAc, excluded, rawColl });
+      const balance = rawColl - (total + excluded);
+      rows.push({ date: new Date(cur), eCash, eCheque, spC, spCh, a, rcdc, mc, misc, total, revAc, rcdcAc, dwAc, excluded, rawColl, balance });
       cur = new Date(cur.getTime() + 24 * 60 * 60 * 1000);
     }
 
     computedData = { rows };
     renderResults(rows);
-    setStatus('msg', `Done — ${rows.length} days processed.`);
+    setStatus('msg', `Done — ${rows.length} days processed.${outlierWarning}`, !!outlierWarning);
   } catch (err) {
     console.error(err);
     setStatus('msg', 'Error while processing files: ' + err.message, true);
@@ -441,7 +464,7 @@ function renderResults(rows) {
 
   const tbody = document.getElementById('tableBody');
   tbody.innerHTML = '';
-  const g = { eCash:0, eCheque:0, spC:0, spCh:0, a:0, rcdc:0, mc:0, misc:0, total:0, revAc:0, rcdcAc:0, dwAc:0, excluded:0, rawColl:0 };
+  const g = { eCash:0, eCheque:0, spC:0, spCh:0, a:0, rcdc:0, mc:0, misc:0, total:0, revAc:0, rcdcAc:0, dwAc:0, excluded:0, rawColl:0, balance:0 };
 
   for (const r of rows) {
     for (const k in g) g[k] += (r[k] || 0);
@@ -463,7 +486,8 @@ function renderResults(rows) {
       <td class="num">${fmt(r.dwAc)}</td>
       <td class="num total-col">${fmt(r.total)}</td>
       <td class="num">${fmt(r.excluded)}</td>
-      <td class="num total-col">${fmt(r.rawColl)}</td>`;
+      <td class="num total-col">${fmt(r.rawColl)}</td>
+      <td class="num">${fmt(r.balance)}</td>`;
     tbody.appendChild(tr);
   }
 
@@ -485,7 +509,8 @@ function renderResults(rows) {
     <td class="num">${fmt(g.dwAc)}</td>
     <td class="num total-col">${fmt(g.total)}</td>
     <td class="num">${fmt(g.excluded)}</td>
-    <td class="num total-col">${fmt(g.rawColl)}</td>`;
+    <td class="num total-col">${fmt(g.rawColl)}</td>
+    <td class="num">${fmt(g.balance)}</td>`;
   tbody.appendChild(totalTr);
 
   const metaCards = document.getElementById('metaCards');
@@ -496,7 +521,8 @@ function renderResults(rows) {
     <div class="card"><div class="label">RC/DC</div><div class="value">₹${fmt(g.rcdc)}</div></div>
     <div class="card"><div class="label">Meter Cost</div><div class="value">₹${fmt(g.mc)}</div></div>
     <div class="card"><div class="label">Grand Total</div><div class="value">₹${fmt(g.total)}</div></div>
-    <div class="card"><div class="label">Total Collection (ID-wise)</div><div class="value">₹${fmt(g.rawColl)}</div></div>`;
+    <div class="card"><div class="label">Total Collection (ID-wise)</div><div class="value">₹${fmt(g.rawColl)}</div></div>
+    <div class="card"><div class="label">Balance</div><div class="value">₹${fmt(g.balance)}</div></div>`;
 
   document.getElementById('resultsSection').style.display = 'block';
 }
@@ -514,13 +540,13 @@ async function downloadExcel() {
     // format — a plain "#,##,##0" doesn't scale correctly once a value
     // crosses into lakhs in most Excel versions, so we branch by size.
     const INR_FMT = '[>9999999]##\\,##\\,##\\,##0;[>99999]##\\,##\\,##0;##,##0';
-    const totalCols = 16; // A..N (14) + Temporary (O) + Total Collection ID-wise (P)
+    const totalCols = 17; // A..N (14) + Temporary (O) + Total Collection ID-wise (P) + Balance (Q)
 
     ws.columns = [
       { width: 12 }, { width: 10 }, { width: 10 }, { width: 10 }, { width: 10 },
       { width: 11 }, { width: 9 },  { width: 11 }, { width: 9 },  { width: 12 },
       { width: 11 }, { width: 11 }, { width: 10 }, { width: 12 }, { width: 13 },
-      { width: 16 },
+      { width: 16 }, { width: 12 },
     ];
 
     const thinBorder = {
@@ -536,6 +562,7 @@ async function downloadExcel() {
     ws.mergeCells('K1:N1');
     ws.mergeCells('O1:O3');
     ws.mergeCells('P1:P3');
+    ws.mergeCells('Q1:Q3');
     ws.mergeCells('B2:C2');
     ws.mergeCells('D2:E2');
     ws.mergeCells('F2:F3');
@@ -553,6 +580,7 @@ async function downloadExcel() {
     ws.getCell('K1').value = 'Deposite';
     ws.getCell('O1').value = 'Temporary';
     ws.getCell('P1').value = 'Total Collection (ID-wise)';
+    ws.getCell('Q1').value = 'Balance';
     ws.getCell('B2').value = 'ENERGY BILL';
     ws.getCell('D2').value = 'Smart Prepaid';
     ws.getCell('F2').value = 'Assessment';
@@ -605,6 +633,7 @@ async function downloadExcel() {
       }
       excelRow.getCell(15).value = Math.round(row.excluded || 0);
       excelRow.getCell(16).value = Math.round(row.rawColl || 0);
+      excelRow.getCell(17).value = { formula: `P${r}-(J${r}+O${r})` };
 
       for (let c = 1; c <= totalCols; c++) {
         const cell = excelRow.getCell(c);
@@ -617,6 +646,7 @@ async function downloadExcel() {
           cell.alignment = { horizontal: 'right' };
           if (c === 10 || c === 14 || c === 16) cell.font = { bold: true, color: { argb: 'FF1F5FBF' } };
           if (c === 15) cell.font = { italic: true, color: { argb: 'FF8A5A2B' } };
+          if (c === 17) cell.font = { bold: true, color: { argb: 'FFB03A2E' } };
         }
         if (r % 2 === 0) {
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F6FA' } };
@@ -629,7 +659,7 @@ async function downloadExcel() {
     // ---- Total row (also live SUM formulas, one per column) ----
     const totalRow = ws.getRow(r);
     totalRow.getCell(1).value = 'TOTAL';
-    ['B','C','D','E','F','G','H','I','K','L','M','O','P'].forEach(col => {
+    ['B','C','D','E','F','G','H','I','K','L','M','O','P','Q'].forEach(col => {
       totalRow.getCell(col).value = { formula: `SUM(${col}${firstDataRow}:${col}${lastDataRow})` };
     });
     totalRow.getCell('J').value = { formula: `SUM(B${r}:I${r})` };
