@@ -156,7 +156,8 @@
     <div style="color:var(--muted); font-size:0.78rem; margin-top:6px;">
       "Temporary" = Temporary Energy Charge + Meter Cost entries of exactly ₹2,400 / ₹6,000 from the HeadWise report — kept aside, not part of any Collection/Deposite total.<br>
       "Total Collection (ID-wise)" = everything for Collector IDs <span id="idListLabel"></span> combined — every bill type from Daily Collection (Energy Bill, Assessment, RC/DC, New Service Connection, Testing, Change Process, Meter Seal, all of it) plus every payment mode from Smart Prepaid. Nothing excluded; not split by category.<br>
-      "Balance" = Total Collection (ID-wise) − (Collection Total + Temporary).
+      "Balance" = Total Collection (ID-wise) − (Collection Total + Temporary).<br>
+      The downloaded Excel file also includes every uploaded source file as its own sheet(s) (Daily Collection, HeadWise, and each Smart Prepaid file), exactly as uploaded, alongside the computed "Collection Report" sheet.
     </div>
 
 
@@ -170,7 +171,8 @@
 </div>
 
 <script>
-let computedData = null; // { rows: [...], dates: [...] }
+let computedData = null; // { rows: [...], raw: {...} }
+let rawSourceData = { daily: null, headwise: null, smartprepaid: [] }; // captured verbatim for export as extra sheets
 
 function setStatus(id, msg, isError) {
   const el = document.getElementById('status-' + id);
@@ -271,6 +273,9 @@ async function processFiles() {
   document.getElementById('processBtn').disabled = true;
   setStatus('msg', 'Processing...');
 
+  // Reset raw capture for this run.
+  rawSourceData = { daily: null, headwise: null, smartprepaid: [] };
+
   try {
     const energy = {};       // date -> {cash, cheque}
     const assess = {};       // date -> amount
@@ -282,6 +287,7 @@ async function processFiles() {
 
     // ---- 1. Daily Collection CSV ----
     const dailyRows = await readCSVRows(dailyFile);
+    rawSourceData.daily = { name: dailyFile.name, rows: dailyRows };
     let dHeaderSkipped = false;
     for (const r of dailyRows) {
       if (!dHeaderSkipped) { dHeaderSkipped = true; continue; }
@@ -321,9 +327,11 @@ async function processFiles() {
 
     const hwWb = await readWorkbook(headwiseFile);
     let hwRowCount = 0;
+    const hwSheetsRaw = [];
     for (const sheetName of hwWb.SheetNames) {
       const sheet = hwWb.Sheets[sheetName];
       const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: null });
+      hwSheetsRaw.push({ name: sheetName, rows: rows });
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
         if (!row || row.length < 10) continue;
@@ -351,6 +359,7 @@ async function processFiles() {
         }
       }
     }
+    rawSourceData.headwise = { name: headwiseFile.name, sheets: hwSheetsRaw };
     setStatus('headwise', `${hwRowCount} matching rows`);
 
     // ---- 3. Smart Prepaid Recharge Report(s) ----
@@ -359,9 +368,11 @@ async function processFiles() {
     let spRowCount = 0;
     for (const file of spFiles) {
       const wb = await readWorkbook(file);
+      const spSheetsRaw = [];
       for (const sheetName of wb.SheetNames) {
         const sheet = wb.Sheets[sheetName];
         const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: null });
+        spSheetsRaw.push({ name: sheetName, rows: rows });
         for (let i = 1; i < rows.length; i++) {
           const row = rows[i];
           if (!row || row.length < 11) continue;
@@ -381,6 +392,7 @@ async function processFiles() {
           }
         }
       }
+      rawSourceData.smartprepaid.push({ name: file.name, sheets: spSheetsRaw });
     }
     setStatus('smartprepaid', `${spRowCount} matching rows across ${spFiles.length} file(s)`);
 
@@ -444,7 +456,7 @@ async function processFiles() {
       cur = new Date(cur.getTime() + 24 * 60 * 60 * 1000);
     }
 
-    computedData = { rows };
+    computedData = { rows, raw: rawSourceData };
     renderResults(rows);
     setStatus('msg', `Done — ${rows.length} days processed.${outlierWarning}`, !!outlierWarning);
   } catch (err) {
@@ -527,11 +539,89 @@ function renderResults(rows) {
   document.getElementById('resultsSection').style.display = 'block';
 }
 
+// ---- Helpers for dumping raw uploaded files as extra sheets ----
+
+// Excel forbids : \ / ? * [ ] in sheet names and caps them at 31 chars.
+// This also de-dupes names (e.g. two source files that share a tab name).
+function safeSheetName(base, usedNames) {
+  let name = String(base).replace(/[:\\\/\?\*\[\]]/g, '_').trim();
+  if (!name) name = 'Sheet';
+  if (name.length > 31) name = name.substring(0, 31);
+  let final = name;
+  let i = 2;
+  while (usedNames.has(final)) {
+    const suffix = '_' + i;
+    final = name.substring(0, Math.max(1, 31 - suffix.length)) + suffix;
+    i++;
+  }
+  usedNames.add(final);
+  return final;
+}
+
+// Lets the browser breathe between heavy synchronous chunks of work, so the
+// tab doesn't look frozen and the "Building file..." label actually gets a
+// chance to paint before the next chunk starts.
+function uiYield() {
+  return new Promise(resolve => setTimeout(resolve, 0));
+}
+
+// Dumps a 2D array of raw rows (as read from the source file, untouched)
+// into a new worksheet, bolding the first row as a header and auto-sizing
+// columns. Used purely so the person can see/verify the original uploaded
+// data inside the same workbook as the computed report.
+//
+// PERFORMANCE NOTE: for large uploads (thousands of rows) this used to walk
+// every inserted cell through ExcelJS's Row/Cell objects twice — once to add
+// each row individually via addRow(), and again via col.eachCell() to work
+// out column widths. That per-cell object overhead, multiplied across every
+// sheet, was the main cause of the long freeze before download started.
+// Both of those are now done against plain JS arrays instead (fast, native
+// V8 loops) and the rows are inserted into the sheet in one bulk addRows()
+// call rather than one addRow() call per row.
+function addRawDataSheet(wb, name, rows, usedNames) {
+  if (!rows || rows.length === 0) return;
+  const sheetName = safeSheetName(name, usedNames);
+  const ws = wb.addWorksheet(sheetName);
+
+  // Normalize once, as plain arrays — no ExcelJS objects touched yet.
+  const cleanRows = rows.map(row =>
+    Array.isArray(row) ? row.map(cell => (cell === undefined ? null : cell)) : [row]
+  );
+
+  // Column widths from the plain array (cheap), before anything is inserted.
+  let maxCols = 0;
+  for (let i = 0; i < cleanRows.length; i++) {
+    if (cleanRows[i].length > maxCols) maxCols = cleanRows[i].length;
+  }
+  const widths = new Array(maxCols).fill(10);
+  for (let i = 0; i < cleanRows.length; i++) {
+    const row = cleanRows[i];
+    for (let c = 0; c < row.length; c++) {
+      const v = row[c];
+      const len = (v === null || v === undefined) ? 0 : String(v).length;
+      if (len > widths[c]) widths[c] = len;
+    }
+  }
+  widths.forEach((w, idx) => { ws.getColumn(idx + 1).width = Math.min(w + 2, 40); });
+
+  // One bulk insert instead of thousands of individual addRow() calls.
+  ws.addRows(cleanRows);
+
+  // Style just the header row (row 1).
+  ws.getRow(1).eachCell({ includeEmpty: true }, cell => {
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1C2733' } };
+  });
+
+  ws.views = [{ state: 'frozen', ySplit: 1 }];
+}
+
 async function downloadExcel() {
   if (!computedData) return;
   const rows = computedData.rows;
   const btn = document.querySelector('.btn-row .btn.secondary');
   if (btn) { btn.disabled = true; btn.textContent = 'Building file...'; }
+  await uiYield(); // let the button repaint before the heavy work below starts
 
   try {
     const wb = new ExcelJS.Workbook();
@@ -681,7 +771,69 @@ async function downloadExcel() {
 
     ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 3, topLeftCell: 'A4', activeCell: 'A4' }];
 
+    await uiYield();
+
+    // ---- Append every uploaded source file as its own sheet(s), verbatim ----
+    // Yielding to the browser between sheets keeps the tab responsive on
+    // large uploads instead of one long unbroken freeze.
+    const usedSheetNames = new Set(['Collection Report']);
+    if (computedData.raw) {
+      if (computedData.raw.daily) {
+        if (btn) btn.textContent = 'Adding Daily Collection...';
+        await uiYield();
+        addRawDataSheet(wb, 'Daily Collection', computedData.raw.daily.rows, usedSheetNames);
+        await uiYield();
+      }
+      if (computedData.raw.headwise) {
+        if (btn) btn.textContent = 'Adding HeadWise...';
+        await uiYield();
+        for (const s of computedData.raw.headwise.sheets) {
+          const label = computedData.raw.headwise.sheets.length > 1 ? `HeadWise_${s.name}` : 'HeadWise';
+          addRawDataSheet(wb, label, s.rows, usedSheetNames);
+          await uiYield();
+        }
+      }
+      if (computedData.raw.smartprepaid && computedData.raw.smartprepaid.length) {
+        if (btn) btn.textContent = 'Adding Smart Prepaid...';
+        await uiYield();
+        // Combine every uploaded Smart Prepaid file's sheet(s) into ONE sheet
+        // (all of them share the same column layout), rather than a separate
+        // tab per file/sheet. We only drop a sheet's first row when it truly
+        // matches the very first header row we saw (cell-by-cell, case/space
+        // insensitive) — NOT just because it's "the first row of any sheet
+        // after the first one". Some sheets start straight with real data
+        // (e.g. a consumer number), and blindly slicing row 1 off every sheet
+        // was silently dropping that data.
+        let combinedSpRows = [];
+        let referenceHeader = null;
+        for (const f of computedData.raw.smartprepaid) {
+          for (const s of f.sheets) {
+            if (!s.rows || s.rows.length === 0) continue;
+            if (referenceHeader === null) {
+              referenceHeader = s.rows[0];
+              combinedSpRows = combinedSpRows.concat(s.rows);
+            } else {
+              const firstRow = s.rows[0];
+              const looksLikeHeader = Array.isArray(firstRow) &&
+                Array.isArray(referenceHeader) &&
+                firstRow.length === referenceHeader.length &&
+                referenceHeader.every((val, idx) =>
+                  String(val ?? '').trim().toLowerCase() === String(firstRow[idx] ?? '').trim().toLowerCase()
+                );
+              combinedSpRows = combinedSpRows.concat(looksLikeHeader ? s.rows.slice(1) : s.rows);
+            }
+          }
+          await uiYield();
+        }
+        addRawDataSheet(wb, 'SP1', combinedSpRows, usedSheetNames);
+        await uiYield();
+      }
+    }
+
     wb.creator = 'Collection Report Builder';
+
+    if (btn) btn.textContent = 'Writing Excel file...';
+    await uiYield();
 
     const buf = await wb.xlsx.writeBuffer();
     const blob = new Blob([buf], { type: 'application/octet-stream' });
