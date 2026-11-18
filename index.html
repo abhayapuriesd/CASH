@@ -20,44 +20,32 @@
   h1 { font-size: 1.5rem; margin: 0 0 4px; font-weight: 600; }
   h2 { font-size: 1.05rem; margin: 28px 0 10px; font-weight: 600; color: var(--text); }
   .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 20px; }
-
   .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
-
-  .id-row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom: 18px; }
+  .id-row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom: 14px; }
   .id-row label { font-size: 0.82rem; color: var(--muted); }
   .id-row input[type=text] {
     background: var(--bg); border: 1px solid var(--border); color: var(--text);
     border-radius: 6px; padding: 8px 10px; font-size: 0.85rem; width: 260px;
   }
-
+  .id-row input.short { width: 90px; }
   .upload-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
-  .upload-slot {
-    border: 1.5px dashed var(--border); border-radius: 10px; padding: 16px;
-    background: var(--bg); transition: border-color 0.15s;
-  }
+  .upload-slot { border: 1.5px dashed var(--border); border-radius: 10px; padding: 16px; background: var(--bg); transition: border-color 0.15s; }
   .upload-slot.filled { border-color: var(--accent2); border-style: solid; }
   .upload-slot .title { font-weight: 600; font-size: 0.88rem; margin-bottom: 4px; }
   .upload-slot .desc { color: var(--muted); font-size: 0.75rem; margin-bottom: 10px; line-height:1.4; }
   .upload-slot input[type=file] { font-size: 0.78rem; color: var(--muted); width: 100%; }
   .upload-slot .status { margin-top: 8px; font-size: 0.78rem; color: var(--accent2); min-height: 1em; }
-
-  .btn {
-    background: var(--accent2); color: #04240f; border: none; border-radius: 8px;
-    padding: 11px 20px; font-weight: 600; font-size: 0.9rem; cursor: pointer;
-  }
+  .btn { background: var(--accent2); color: #04240f; border: none; border-radius: 8px; padding: 11px 20px; font-weight: 600; font-size: 0.9rem; cursor: pointer; }
   .btn:hover { opacity: 0.9; }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; }
   .btn.secondary { background: var(--accent); color: #04122e; }
   .btn-row { display:flex; gap:12px; align-items:center; margin: 18px 0; flex-wrap:wrap; }
-
   #status-msg { color: var(--muted); font-size: 0.85rem; }
   #status-msg.error { color: var(--danger); }
-
   .meta-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 22px; }
   .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
   .card .label { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
   .card .value { font-size: 1.2rem; font-weight: 600; color: var(--accent2); }
-
   .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
   table { border-collapse: collapse; width: 100%; min-width: 1150px; font-size: 0.82rem; }
   thead th { background: var(--header-bg); color: var(--text); font-weight: 600; padding: 8px 10px; text-align: right; border: 1px solid var(--border); white-space: nowrap; }
@@ -68,10 +56,7 @@
   td.num { text-align: right; font-variant-numeric: tabular-nums; }
   td.total-col { font-weight: 600; color: var(--accent); }
   tr.grand-total { background: var(--total-bg) !important; font-weight: 700; }
-
   footer { margin-top: 24px; color: var(--muted); font-size: 0.78rem; line-height: 1.6; }
-  footer code { background: var(--panel); padding: 1px 5px; border-radius: 4px; }
-
   #resultsSection { display: none; }
 </style>
 </head>
@@ -85,6 +70,10 @@
     <div class="id-row">
       <label>Collector IDs to include (comma separated):</label>
       <input type="text" id="collectorIds" value="40003813, 40003144">
+    </div>
+    <div class="id-row">
+      <label>For Balance: include all Collector IDs that start with:</label>
+      <input type="text" id="cashPrefix" class="short" value="400">
     </div>
 
     <h2>2. Upload files for this month</h2>
@@ -155,24 +144,21 @@
     </div>
     <div style="color:var(--muted); font-size:0.78rem; margin-top:6px;">
       "Temporary" = Temporary Energy Charge + Meter Cost entries of exactly ₹2,400 / ₹6,000 from the HeadWise report — kept aside, not part of any Collection/Deposite total.<br>
-      "Total Collection (ID-wise)" = everything for Collector IDs <span id="idListLabel"></span> combined — every bill type from Daily Collection (Energy Bill, Assessment, RC/DC, New Service Connection, Testing, Change Process, Meter Seal, all of it) plus every payment mode from Smart Prepaid. Nothing excluded; not split by category.<br>
-      "Balance" = Total Collection (ID-wise) − (Collection Total + Temporary).<br>
-      The downloaded Excel file also includes every uploaded source file as its own sheet(s) (Daily Collection, HeadWise, and each Smart Prepaid file), exactly as uploaded, alongside the computed "Collection Report" sheet.
+      "Total Collection (ID-wise)" = everything for Collector IDs <span id="idListLabel"></span> combined — every bill type from Daily Collection plus Smart Prepaid, but only Cash + Cheque payments. RTGS, Govt Adjustment, Board Adjustment and Tower Adjustment are not counted.<br>
+      "Balance" = (Cash + Cheque of <b>all</b> Collector IDs starting with "<span id="prefixLabel"></span>", from Daily Collection and Smart Prepaid; RTGS / adjustments excluded) − Total Collection (ID-wise). Shows how much of the 400-series collection is not covered by the IDs in the include box; 0 means everything matches.
     </div>
-
-
 
     <footer>
       RC/DC = Daily Collection (Disconnection/Reconnection Charge) + HeadWise (Disconnection Reconnection Charge + New Service Connection Disconnection Charge).<br>
       Deposite → Rev A/c = Energy Bill + Assessment + Smart Prepaid &nbsp;|&nbsp; RC/DC A/c = All RC/DC &nbsp;|&nbsp; DW A/c = Meter Cost + Misc.<br>
-      Temporary Energy Charge and Meter Cost entries of exactly ₹2,400 / ₹6,000 are excluded from HeadWise data. Only the Collector IDs listed above are included; everything else is ignored.
+      Temporary Energy Charge and Meter Cost entries of exactly ₹2,400 / ₹6,000 are excluded from HeadWise data. Only the Collector IDs listed above are included in the Collection/Deposite columns.
     </footer>
   </div>
 </div>
 
 <script>
-let computedData = null; // { rows: [...], raw: {...} }
-let rawSourceData = { daily: null, headwise: null, smartprepaid: [] }; // captured verbatim for export as extra sheets
+let computedData = null;
+let rawSourceData = { daily: null, headwise: null, smartprepaid: [] };
 
 function setStatus(id, msg, isError) {
   const el = document.getElementById('status-' + id);
@@ -184,42 +170,25 @@ function setStatus(id, msg, isError) {
   }
 }
 
-// All date handling below works directly off the calendar y/m/d components
-// (never through a JS Date object's local/UTC getters while reading source
-// files) so the result can never shift by a day because of the browser's
-// timezone. A JS Date (built with Date.UTC) is only constructed at the very
-// end, purely to sort/iterate/display, and is always read back with the UTC
-// getters to match how it was built.
-
 function pad2(n) { return String(n).padStart(2, '0'); }
 
-// Excel serial date number -> 'YYYY-MM-DD' key, no Date object involved.
 function excelSerialToKey(serial) {
   const d = XLSX.SSF.parse_date_code(serial);
   if (!d) return null;
   return d.y + '-' + pad2(d.m) + '-' + pad2(d.d);
 }
 
-// Accepts a raw cell value (number, string, or Date) coming from either the
-// CSV or an Excel file and returns a 'YYYY-MM-DD' key using its own calendar
-// components only.
 function cellDateToKey(v) {
   if (v === null || v === undefined || v === '') return null;
-  if (typeof v === 'number') {
-    return excelSerialToKey(v);
-  }
+  if (typeof v === 'number') return excelSerialToKey(v);
   if (v instanceof Date) {
-    // Only reached if a library handed us a Date object directly. Use LOCAL
-    // getters here because that's how such objects are normally constructed
-    // (new Date(y, m, d) uses local time), so this stays consistent with the
-    // calendar date the source actually intended.
     return v.getFullYear() + '-' + pad2(v.getMonth() + 1) + '-' + pad2(v.getDate());
   }
   if (typeof v === 'string') {
     const s = v.trim();
-    let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);       // YYYY-MM-DD
+    let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
     if (m) return m[1] + '-' + pad2(m[2]) + '-' + pad2(m[3]);
-    m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/); // DD-MM-YYYY or DD/MM/YYYY
+    m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
     if (m) return m[3] + '-' + pad2(m[1]) + '-' + pad2(m[2]);
     const d = new Date(s);
     if (!isNaN(d)) return cellDateToKey(d);
@@ -227,8 +196,6 @@ function cellDateToKey(v) {
   return null;
 }
 
-// Build a UTC-based Date purely for sorting/iterating/exporting, from a
-// 'YYYY-MM-DD' key. Always read back with getUTC* to match.
 function keyToUTCDate(key) {
   const [y, m, d] = key.split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d));
@@ -236,9 +203,6 @@ function keyToUTCDate(key) {
 
 async function readWorkbook(file) {
   const buf = await file.arrayBuffer();
-  // Deliberately NOT using cellDates:true — we read the raw Excel serial
-  // number ourselves via excelSerialToKey() to avoid any local-timezone
-  // conversion that a JS Date object would introduce.
   return XLSX.read(buf, { type: 'array' });
 }
 
@@ -249,8 +213,11 @@ async function readCSVRows(file) {
 }
 
 function getTargetIds() {
-  return document.getElementById('collectorIds').value
-    .split(',').map(s => s.trim()).filter(Boolean);
+  return document.getElementById('collectorIds').value.split(',').map(s => s.trim()).filter(Boolean);
+}
+
+function getCashPrefix() {
+  return document.getElementById('cashPrefix').value.trim();
 }
 
 async function processFiles() {
@@ -269,21 +236,23 @@ async function processFiles() {
     setStatus('msg', 'Please enter at least one Collector ID.', true);
     return;
   }
+  const cashPrefix = getCashPrefix();
+  if (!cashPrefix) {
+    setStatus('msg', 'Please enter the ID prefix (e.g. 400) for the Balance calculation.', true);
+    return;
+  }
 
   document.getElementById('processBtn').disabled = true;
   setStatus('msg', 'Processing...');
-
-  // Reset raw capture for this run.
   rawSourceData = { daily: null, headwise: null, smartprepaid: [] };
 
   try {
-    const energy = {};       // date -> {cash, cheque}
-    const assess = {};       // date -> amount
-    const rcdcDaily = {};    // date -> amount
-    const rawTotal = {};     // date -> amount — EVERYTHING for the target IDs (both combined), no
-                              // bill-type filtering at all: every row, every amount column from Daily
-                              // Collection (Energy, Assessment, RC/DC, New Service Connection, Testing,
-                              // Change Process, Meter Seal, everything) + every payment mode from Smart Prepaid.
+    const energy = {};
+    const assess = {};
+    const rcdcDaily = {};
+    const rawTotal = {};   // everything for the target IDs
+    const total400 = {};     // date -> cash+cheque of ALL IDs starting with the prefix (independent of the include box)
+    const cashPrefixed = {}; // date -> CASH of ALL IDs starting with cashPrefix (Daily cash + Smart Prepaid cash/cash_os)
 
     // ---- 1. Daily Collection CSV ----
     const dailyRows = await readCSVRows(dailyFile);
@@ -301,11 +270,17 @@ async function processFiles() {
       const towerAdj = parseFloat(r[7]) || 0;
       const cid = (r[8] || '').trim();
       const billType = (r[9] || '').trim();
-      if (!targetIds.has(cid)) continue;
       const key = cellDateToKey(dateStr);
       if (!key) continue;
-      // Unfiltered: every row for this collector counts here, regardless of bill type.
-      rawTotal[key] = (rawTotal[key] || 0) + cash + cheque + rtgs + govtAdj + boardAdj + towerAdj;
+
+      // Cash of every ID that starts with the prefix (400...), regardless of bill type.
+      if (cid.startsWith(cashPrefix)) {
+        cashPrefixed[key] = (cashPrefixed[key] || 0) + cash;
+        total400[key] = (total400[key] || 0) + cash + cheque;
+      }
+
+      if (!targetIds.has(cid)) continue;
+      rawTotal[key] = (rawTotal[key] || 0) + cash + cheque; // RTGS / Govt / Board / Tower Adjustment excluded
       if (billType === 'ENERGY BILL') {
         energy[key] = energy[key] || { cash: 0, cheque: 0 };
         energy[key].cash += cash;
@@ -319,10 +294,10 @@ async function processFiles() {
     setStatus('daily', `${dailyRows.length - 1} rows read`);
 
     // ---- 2. HeadWise Collection Report ----
-    const meterCost = {};      // date -> amount
-    const rcdcHeadwise = {};   // date -> amount
-    const miscHeadwise = {};   // date -> amount
-    const excludedHeadwise = {}; // date -> amount (Temporary Energy Charge + Meter Cost of ₹2,400/₹6,000, kept aside)
+    const meterCost = {};
+    const rcdcHeadwise = {};
+    const miscHeadwise = {};
+    const excludedHeadwise = {};
     const RCDC_HEADS = new Set(['DISCONNECTION RECONNECTION CHARGE', 'NEW SERVICE CONNECTION DISCONNECTION CHARGE']);
 
     const hwWb = await readWorkbook(headwiseFile);
@@ -381,10 +356,20 @@ async function processFiles() {
           const key = cellDateToKey(row[4]);
           const cid = row[10] ? String(row[10]).trim() : null;
           if (!mode || isNaN(amount) || !key || !cid) continue;
+
+          // Cash of every ID that starts with the prefix (400...).
+          if (cid.startsWith(cashPrefix) && (mode === 'cash' || mode === 'cash_os')) {
+            cashPrefixed[key] = (cashPrefixed[key] || 0) + amount;
+          }
+          if (cid.startsWith(cashPrefix) && (mode === 'cash' || mode === 'cash_os' || mode === 'cheque')) {
+            total400[key] = (total400[key] || 0) + amount;
+          }
+
           if (!targetIds.has(cid)) continue;
           spRowCount++;
-          // Unfiltered: every payment mode counts towards the raw total (cash, cheque, rtgs, adjustments — everything).
-          rawTotal[key] = (rawTotal[key] || 0) + amount;
+          if (mode === 'cash' || mode === 'cash_os' || mode === 'cheque') {
+            rawTotal[key] = (rawTotal[key] || 0) + amount; // only cash/cheque; other modes excluded
+          }
           if (mode === 'cash' || mode === 'cash_os') {
             spCash[key] = (spCash[key] || 0) + amount;
           } else if (mode === 'cheque') {
@@ -396,12 +381,12 @@ async function processFiles() {
     }
     setStatus('smartprepaid', `${spRowCount} matching rows across ${spFiles.length} file(s)`);
 
-    // ---- Build date range (min to max across all data) ----
+    // ---- Date range (based on the selected IDs' data only) ----
     const allKeys = new Set([
       ...Object.keys(energy), ...Object.keys(assess), ...Object.keys(rcdcDaily),
       ...Object.keys(meterCost), ...Object.keys(rcdcHeadwise), ...Object.keys(miscHeadwise),
       ...Object.keys(spCash), ...Object.keys(spCheque), ...Object.keys(excludedHeadwise),
-      ...Object.keys(rawTotal)
+      ...Object.keys(rawTotal), ...Object.keys(total400), ...Object.keys(cashPrefixed)
     ]);
     if (allKeys.size === 0) {
       setStatus('msg', 'No matching data found for the given Collector IDs. Please check the IDs and files.', true);
@@ -412,13 +397,6 @@ async function processFiles() {
     const minDate = keyToUTCDate(sortedKeys[0]);
     const maxDate = keyToUTCDate(sortedKeys[sortedKeys.length - 1]);
 
-    // Outlier check: a single mistyped date (e.g. Excel silently reinterprets
-    // "02-08-2026" typed into a date-formatted cell as 08-Feb instead of
-    // 02-Aug) creates a date isolated far from the rest of the data, which
-    // then drags the whole report's date range open with a long run of
-    // empty/zero days. Flag the largest gap between consecutive dates so the
-    // person can go fix the source file instead of quietly getting a
-    // stretched-out report.
     let maxGapDays = 0, gapAt = -1;
     for (let i = 1; i < sortedKeys.length; i++) {
       const gap = Math.round((keyToUTCDate(sortedKeys[i]) - keyToUTCDate(sortedKeys[i - 1])) / 86400000);
@@ -451,12 +429,15 @@ async function processFiles() {
       const dwAc = mc + misc;
       const excluded = excludedHeadwise[key] || 0;
       const rawColl = rawTotal[key] || 0;
-      const balance = rawColl - (total + excluded);
-      rows.push({ date: new Date(cur), eCash, eCheque, spC, spCh, a, rcdc, mc, misc, total, revAc, rcdcAc, dwAc, excluded, rawColl, balance });
+      const cashPfx = cashPrefixed[key] || 0;
+      const tot400 = total400[key] || 0;
+      // Balance = (cash+cheque of ALL 400* IDs) − Total Collection (ID-wise of the include box)
+      const balance = tot400 - rawColl;
+      rows.push({ date: new Date(cur), eCash, eCheque, spC, spCh, a, rcdc, mc, misc, total, revAc, rcdcAc, dwAc, excluded, rawColl, tot400, cashPfx, balance });
       cur = new Date(cur.getTime() + 24 * 60 * 60 * 1000);
     }
 
-    computedData = { rows, raw: rawSourceData };
+    computedData = { rows, raw: rawSourceData, cashPrefix };
     renderResults(rows);
     setStatus('msg', `Done — ${rows.length} days processed.${outlierWarning}`, !!outlierWarning);
   } catch (err) {
@@ -473,17 +454,13 @@ function fmt(n) {
 
 function renderResults(rows) {
   document.getElementById('idListLabel').textContent = getTargetIds().join(', ');
+  document.getElementById('prefixLabel').textContent = getCashPrefix();
 
   const tbody = document.getElementById('tableBody');
   tbody.innerHTML = '';
-  const g = { eCash:0, eCheque:0, spC:0, spCh:0, a:0, rcdc:0, mc:0, misc:0, total:0, revAc:0, rcdcAc:0, dwAc:0, excluded:0, rawColl:0, balance:0 };
+  const g = { eCash:0, eCheque:0, spC:0, spCh:0, a:0, rcdc:0, mc:0, misc:0, total:0, revAc:0, rcdcAc:0, dwAc:0, excluded:0, rawColl:0, tot400:0, cashPfx:0, balance:0 };
 
-  for (const r of rows) {
-    for (const k in g) g[k] += (r[k] || 0);
-    const tr = document.createElement('tr');
-    const dstr = r.date.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'2-digit', timeZone: 'UTC' });
-    tr.innerHTML = `
-      <td>${dstr}</td>
+  const cells = r => `
       <td class="num">${fmt(r.eCash)}</td>
       <td class="num">${fmt(r.eCheque)}</td>
       <td class="num">${fmt(r.spC)}</td>
@@ -500,33 +477,21 @@ function renderResults(rows) {
       <td class="num">${fmt(r.excluded)}</td>
       <td class="num total-col">${fmt(r.rawColl)}</td>
       <td class="num">${fmt(r.balance)}</td>`;
+
+  for (const r of rows) {
+    for (const k in g) g[k] += (r[k] || 0);
+    const tr = document.createElement('tr');
+    const dstr = r.date.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'2-digit', timeZone: 'UTC' });
+    tr.innerHTML = `<td>${dstr}</td>` + cells(r);
     tbody.appendChild(tr);
   }
 
   const totalTr = document.createElement('tr');
   totalTr.className = 'grand-total';
-  totalTr.innerHTML = `
-    <td>TOTAL</td>
-    <td class="num">${fmt(g.eCash)}</td>
-    <td class="num">${fmt(g.eCheque)}</td>
-    <td class="num">${fmt(g.spC)}</td>
-    <td class="num">${fmt(g.spCh)}</td>
-    <td class="num">${fmt(g.a)}</td>
-    <td class="num">${fmt(g.rcdc)}</td>
-    <td class="num">${fmt(g.mc)}</td>
-    <td class="num">${fmt(g.misc)}</td>
-    <td class="num total-col">${fmt(g.total)}</td>
-    <td class="num">${fmt(g.revAc)}</td>
-    <td class="num">${fmt(g.rcdcAc)}</td>
-    <td class="num">${fmt(g.dwAc)}</td>
-    <td class="num total-col">${fmt(g.total)}</td>
-    <td class="num">${fmt(g.excluded)}</td>
-    <td class="num total-col">${fmt(g.rawColl)}</td>
-    <td class="num">${fmt(g.balance)}</td>`;
+  totalTr.innerHTML = `<td>TOTAL</td>` + cells(g);
   tbody.appendChild(totalTr);
 
-  const metaCards = document.getElementById('metaCards');
-  metaCards.innerHTML = `
+  document.getElementById('metaCards').innerHTML = `
     <div class="card"><div class="label">Energy Bill</div><div class="value">₹${fmt(g.eCash+g.eCheque)}</div></div>
     <div class="card"><div class="label">Smart Prepaid</div><div class="value">₹${fmt(g.spC+g.spCh)}</div></div>
     <div class="card"><div class="label">Assessment</div><div class="value">₹${fmt(g.a)}</div></div>
@@ -534,15 +499,13 @@ function renderResults(rows) {
     <div class="card"><div class="label">Meter Cost</div><div class="value">₹${fmt(g.mc)}</div></div>
     <div class="card"><div class="label">Grand Total</div><div class="value">₹${fmt(g.total)}</div></div>
     <div class="card"><div class="label">Total Collection (ID-wise)</div><div class="value">₹${fmt(g.rawColl)}</div></div>
+    <div class="card"><div class="label">Cash+Cheque of ${getCashPrefix()}* IDs</div><div class="value">₹${fmt(g.tot400)}</div></div>
+    <div class="card"><div class="label">Cash of ${getCashPrefix()}* IDs</div><div class="value">₹${fmt(g.cashPfx)}</div></div>
     <div class="card"><div class="label">Balance</div><div class="value">₹${fmt(g.balance)}</div></div>`;
 
   document.getElementById('resultsSection').style.display = 'block';
 }
 
-// ---- Helpers for dumping raw uploaded files as extra sheets ----
-
-// Excel forbids : \ / ? * [ ] in sheet names and caps them at 31 chars.
-// This also de-dupes names (e.g. two source files that share a tab name).
 function safeSheetName(base, usedNames) {
   let name = String(base).replace(/[:\\\/\?\*\[\]]/g, '_').trim();
   if (!name) name = 'Sheet';
@@ -558,37 +521,17 @@ function safeSheetName(base, usedNames) {
   return final;
 }
 
-// Lets the browser breathe between heavy synchronous chunks of work, so the
-// tab doesn't look frozen and the "Building file..." label actually gets a
-// chance to paint before the next chunk starts.
-function uiYield() {
-  return new Promise(resolve => setTimeout(resolve, 0));
-}
+function uiYield() { return new Promise(resolve => setTimeout(resolve, 0)); }
 
-// Dumps a 2D array of raw rows (as read from the source file, untouched)
-// into a new worksheet, bolding the first row as a header and auto-sizing
-// columns. Used purely so the person can see/verify the original uploaded
-// data inside the same workbook as the computed report.
-//
-// PERFORMANCE NOTE: for large uploads (thousands of rows) this used to walk
-// every inserted cell through ExcelJS's Row/Cell objects twice — once to add
-// each row individually via addRow(), and again via col.eachCell() to work
-// out column widths. That per-cell object overhead, multiplied across every
-// sheet, was the main cause of the long freeze before download started.
-// Both of those are now done against plain JS arrays instead (fast, native
-// V8 loops) and the rows are inserted into the sheet in one bulk addRows()
-// call rather than one addRow() call per row.
 function addRawDataSheet(wb, name, rows, usedNames) {
   if (!rows || rows.length === 0) return;
   const sheetName = safeSheetName(name, usedNames);
   const ws = wb.addWorksheet(sheetName);
 
-  // Normalize once, as plain arrays — no ExcelJS objects touched yet.
   const cleanRows = rows.map(row =>
     Array.isArray(row) ? row.map(cell => (cell === undefined ? null : cell)) : [row]
   );
 
-  // Column widths from the plain array (cheap), before anything is inserted.
   let maxCols = 0;
   for (let i = 0; i < cleanRows.length; i++) {
     if (cleanRows[i].length > maxCols) maxCols = cleanRows[i].length;
@@ -604,10 +547,8 @@ function addRawDataSheet(wb, name, rows, usedNames) {
   }
   widths.forEach((w, idx) => { ws.getColumn(idx + 1).width = Math.min(w + 2, 40); });
 
-  // One bulk insert instead of thousands of individual addRow() calls.
   ws.addRows(cleanRows);
 
-  // Style just the header row (row 1).
   ws.getRow(1).eachCell({ includeEmpty: true }, cell => {
     cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1C2733' } };
@@ -621,16 +562,13 @@ async function downloadExcel() {
   const rows = computedData.rows;
   const btn = document.querySelector('.btn-row .btn.secondary');
   if (btn) { btn.disabled = true; btn.textContent = 'Building file...'; }
-  await uiYield(); // let the button repaint before the heavy work below starts
+  await uiYield();
 
   try {
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('Collection Report');
-    // Indian digit grouping (lakh/crore) needs a magnitude-aware conditional
-    // format — a plain "#,##,##0" doesn't scale correctly once a value
-    // crosses into lakhs in most Excel versions, so we branch by size.
     const INR_FMT = '[>9999999]##\\,##\\,##\\,##0;[>99999]##\\,##\\,##0;##,##0';
-    const totalCols = 17; // A..N (14) + Temporary (O) + Total Collection ID-wise (P) + Balance (Q)
+    const totalCols = 17;
 
     ws.columns = [
       { width: 12 }, { width: 10 }, { width: 10 }, { width: 10 }, { width: 10 },
@@ -646,7 +584,6 @@ async function downloadExcel() {
       right: { style: 'thin', color: { argb: 'FFB0B7BF' } },
     };
 
-    // ---- Header rows (1-3) ----
     ws.mergeCells('A1:A3');
     ws.mergeCells('B1:J1');
     ws.mergeCells('K1:N1');
@@ -655,15 +592,7 @@ async function downloadExcel() {
     ws.mergeCells('Q1:Q3');
     ws.mergeCells('B2:C2');
     ws.mergeCells('D2:E2');
-    ws.mergeCells('F2:F3');
-    ws.mergeCells('G2:G3');
-    ws.mergeCells('H2:H3');
-    ws.mergeCells('I2:I3');
-    ws.mergeCells('J2:J3');
-    ws.mergeCells('K2:K3');
-    ws.mergeCells('L2:L3');
-    ws.mergeCells('M2:M3');
-    ws.mergeCells('N2:N3');
+    ['F','G','H','I','J','K','L','M','N'].forEach(c => ws.mergeCells(`${c}2:${c}3`));
 
     ws.getCell('A1').value = 'DATE';
     ws.getCell('B1').value = 'Collection';
@@ -699,20 +628,17 @@ async function downloadExcel() {
       }
     }
 
-    // ---- Data rows ----
     let r = 4;
     const firstDataRow = 4;
     for (const row of rows) {
       const y = row.date.getUTCFullYear(), m = row.date.getUTCMonth() + 1, d = row.date.getUTCDate();
-      const dateStr = pad2(d) + '-' + pad2(m) + '-' + y; // DD-MM-YYYY, plain text (avoids any date-serial/timezone issues)
-      // Raw values for every column except the two Total columns (J, N),
-      // which are written as live SUM formulas instead of static numbers.
+      const dateStr = pad2(d) + '-' + pad2(m) + '-' + y;
       const rawVals = [row.eCash, row.eCheque, row.spC, row.spCh, row.a, row.rcdc, row.mc, row.misc, null, row.revAc, row.rcdcAc, row.dwAc, null];
 
       const excelRow = ws.getRow(r);
       excelRow.getCell(1).value = dateStr;
       for (let i = 0; i < rawVals.length; i++) {
-        const col = 2 + i; // column B=2 .. N=14
+        const col = 2 + i;
         if (col === 10) {
           excelRow.getCell(col).value = { formula: `SUM(B${r}:I${r})` };
         } else if (col === 14) {
@@ -723,7 +649,8 @@ async function downloadExcel() {
       }
       excelRow.getCell(15).value = Math.round(row.excluded || 0);
       excelRow.getCell(16).value = Math.round(row.rawColl || 0);
-      excelRow.getCell(17).value = { formula: `P${r}-(J${r}+O${r})` };
+      // Balance = (cash+cheque of all 400* IDs) − Total Collection (ID-wise)
+      excelRow.getCell(17).value = { formula: `${Math.round(row.tot400 || 0)}-P${r}` };
 
       for (let c = 1; c <= totalCols; c++) {
         const cell = excelRow.getCell(c);
@@ -746,7 +673,6 @@ async function downloadExcel() {
     }
     const lastDataRow = r - 1;
 
-    // ---- Total row (also live SUM formulas, one per column) ----
     const totalRow = ws.getRow(r);
     totalRow.getCell(1).value = 'TOTAL';
     ['B','C','D','E','F','G','H','I','K','L','M','O','P','Q'].forEach(col => {
@@ -773,9 +699,6 @@ async function downloadExcel() {
 
     await uiYield();
 
-    // ---- Append every uploaded source file as its own sheet(s), verbatim ----
-    // Yielding to the browser between sheets keeps the tab responsive on
-    // large uploads instead of one long unbroken freeze.
     const usedSheetNames = new Set(['Collection Report']);
     if (computedData.raw) {
       if (computedData.raw.daily) {
@@ -796,14 +719,6 @@ async function downloadExcel() {
       if (computedData.raw.smartprepaid && computedData.raw.smartprepaid.length) {
         if (btn) btn.textContent = 'Adding Smart Prepaid...';
         await uiYield();
-        // Combine every uploaded Smart Prepaid file's sheet(s) into ONE sheet
-        // (all of them share the same column layout), rather than a separate
-        // tab per file/sheet. We only drop a sheet's first row when it truly
-        // matches the very first header row we saw (cell-by-cell, case/space
-        // insensitive) — NOT just because it's "the first row of any sheet
-        // after the first one". Some sheets start straight with real data
-        // (e.g. a consumer number), and blindly slicing row 1 off every sheet
-        // was silently dropping that data.
         let combinedSpRows = [];
         let referenceHeader = null;
         for (const f of computedData.raw.smartprepaid) {
@@ -848,7 +763,7 @@ async function downloadExcel() {
     document.body.removeChild(link);
   } catch (err) {
     console.error(err);
-    alert('Excel banate waqt error aayi: ' + err.message);
+    alert('Error while building the Excel file: ' + err.message);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '⬇ Download Collection Report'; }
   }
@@ -856,8 +771,7 @@ async function downloadExcel() {
 
 ['file-daily','file-headwise','file-smartprepaid'].forEach(id => {
   document.getElementById(id).addEventListener('change', function() {
-    const slotId = id.replace('file-', 'slot-');
-    const slot = document.getElementById(slotId);
+    const slot = document.getElementById(id.replace('file-', 'slot-'));
     if (this.files.length > 0) slot.classList.add('filled');
     else slot.classList.remove('filled');
   });
